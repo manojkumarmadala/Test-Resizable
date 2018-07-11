@@ -1,0 +1,364 @@
+<html>
+<head>
+   <meta charset="utf-8"/>
+	<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+	<script>
+	
+	var z,z1,test;
+	var priority=[];
+	priority.push(" Blocker(P0)");
+	priority.push(" Blocker(P0)");
+	priority.push(" Blocker(P0)");
+	priority.push(" Blocker(P0)");
+	priority.push(" Blocker(P0)");
+	
+
+var security= 
+{
+"size":1000,
+"query":{
+	"bool":{
+		"must":[
+		
+		{"match":{
+		"DataSource":"JIRA"
+		}
+		
+		},
+		{"match":{
+		"Project":"*Core"
+		}
+		
+		}
+		]}
+},
+ "aggs" : {
+	                "type1":{                   
+					"terms" :  {
+	                    "field" : "Priority.keyword",
+	                 "include" : ["Critical(P1)", "High(P2)" , "Medium(P3)"],
+	                    "order" : {
+	                        "_term" : "asc"
+	                    },
+	                    "size" : 500
+	                }
+
+	                }
+
+	            }
+
+
+};
+
+var aging = {
+
+			"size" : 1000,
+			"query" : {
+				"bool" : {
+					"must" : [
+
+					{"match":{"Project":"*Core"}},
+					{"match":{"Priority":"Medium(P3)"}},
+					{"match":{"DataSource":"JIRA"}}
+
+					]
+				}
+			},
+	"aggs" : {
+	            "langs" : {
+	                
+					"terms" : {
+	                    "field" : "Aging_group.keyword",	                    
+	                    "size" : 500
+	                },
+	                "aggs" : {
+	                "type1":{                   
+					"terms" :  {
+	                    "field" : "SLABreachedMetric.keyword",	                    
+	                    "order" : {
+	                        "_term" : "asc"
+	                    },
+	                    "size" : 500
+	                }
+
+	                }
+
+	            }
+	        }
+	    }
+		};
+	
+var components = {
+
+			"size" : 1000,
+			"query" : {
+				"bool" : {
+					"must" : [
+
+					{
+						"match" : {
+							"SEVERITY" : {"query": "S1 S2",
+								"operator":"or"
+							}	
+
+						}
+					}, {
+						"match" : {
+							"PRODUCT" : "*Chat"
+						}
+					}
+
+					]
+				}
+			},
+			
+			"aggs":{"range": {
+            "date_range": {
+                "field": "CREATED_DATE",
+                "format": "yyyy-MM-dd",
+                "ranges": [
+                    {
+            "from": "2018-01-01"
+          },
+          {
+            
+              "to" : "2018-06-12" 
+          }
+                ]
+            },
+        
+	"aggs" : {
+	            "langs" : {
+	                
+					"terms" : {
+	                    "field" : "COMPONENT.keyword",
+	                    "order" : {
+	                        "_term" : "asc"
+	                    },
+	                    "size" : 500
+	                },
+	                "aggs" : {
+	                "type1":{                   
+					"terms" :  {
+	                    "field" : "INCIDENT_MONTH.keyword",
+	                 
+	                    "order" : {
+	                        "_term" : "asc"
+	                    },
+	                    "size" : 500
+	                },
+	                
+	                    "aggs":{
+	                    "type_count" : {
+	                        "cardinality" : {
+	                            "field" : "ISSUE_ID"
+	                        }
+	                    }
+	                    
+	                    
+	                    
+	                    }
+
+	                }
+
+	            }
+	        }
+	    }
+		}
+		}
+		};
+	
+	
+	var sonar={
+
+		"size" : 0,
+		"query" : {
+			"bool" : {
+				"must" : [
+
+				{
+					"match" : {
+						"SEVERITY" : {"query":"S1 S2 S3",
+							"operator":"or"
+						}	
+
+					}
+				}, {
+					"match" : {
+						"PRODUCT" : "*Chat"
+					}
+				}
+
+				],
+				
+				"filter" : [ {
+					"range" : {
+						"CREATED_DATE" : {
+							"gte" : "2018-01-01",
+							"lte" : "2018-05-25",
+							"format" : "yyyy-MM-dd"
+						}
+					}
+				} ]
+				
+			}
+		},
+
+		"aggs" : {
+			"langs" : {
+				"terms" : {
+					"field" : "COMPONENT.keyword",
+					"order" : {
+						"_term" : "asc"
+					},
+					"size" : 500
+				},
+				"aggs" : {
+				"type1":{
+					"terms" :  {
+					"field" : "INCIDENT_MONTH.keyword",
+					"order" : {
+						"_term" : "asc"
+					},
+					"size" : 500
+				},
+					"aggs":{
+					"type_count" : {
+						"cardinality" : {
+							"field" : "ISSUE_ID"
+						}
+					}
+					
+					
+					
+					}
+
+				}
+
+			}
+		}
+	}
+	};
+	
+	
+	var heatmap={
+	"size" : 0,
+		"query" : {
+			"bool" : {
+				"must" : [
+
+				{
+					"match" : {
+						"PRODUCT" : {"query":"Instrumentation Insights DPX TIE Pulse",
+							"operator":"or"
+						}	
+
+					}
+				}
+
+				],
+				
+				"filter" : [ {
+					"range" : {
+						"CREATED_DATE" : {
+							"gte" : "now-11M/M",
+							"lte" : "now",
+							"format" : "yyyy-MM-dd"
+						}
+					}
+				} ]
+				
+			}
+		},
+		"aggs" : {
+				"client":{
+					"terms" :  {
+					"field" : "CLIENT.keyword",
+					"order" : {
+						"_term" : "asc"
+					},
+					"size" : 500
+				},
+					"aggs":{
+					"month" : {
+						"terms" : {
+							"field" : "INCIDENT_MONTH.keyword",
+							"min_doc_count": 0,
+							"order" : {
+						"_term" : "desc"
+					},
+					"size":500						}
+					}
+					
+					
+					
+					}
+
+				}
+
+			}
+		
+		
+		
+		}
+
+	$.ajax({   url: 'http://elasticsearch05.db.shared.int.sv2.247-inc.net:9200/jiracloud/prodincidents/_search?pretty=true'
+                     , method: 'POST'
+                     , data : JSON.stringify(heatmap)
+                     , dataType : 'json'
+					 ,contentType: "application/x-www-form-urlencoded; charset=utf-8"
+                     
+                     , success: function(json, statusText, xhr) {
+							result = json;
+							console.log(result);
+							//console.log(result.aggregations.type1.buckets.length);
+                           /*for (var i=0;i<result.aggregations.langs.buckets.length;i++){
+						   document.getElementById("test").innerHTML+=result.aggregations.langs.buckets[i].key;
+						   document.getElementById("test").innerHTML+="<br>";
+						   }*/
+                       }
+                     , error: function(xhr, message, error) {
+                           console.error("Error while loading data from ElasticSearch", message);
+						   showError(error);
+                      }
+            });
+	
+
+
+
+
+
+
+
+
+
+/*
+els.count({
+  index: 'jirasecurity',
+  body:{
+  "query":{
+  "term":{
+  "Assignee": "Sharath"
+  }
+  }
+  }
+   
+}, function (error, response) {
+z=response;
+document.getElementById('test').innerHTML=response.count;
+  // ...
+});*/
+
+
+
+
+
+	</script>
+</head>
+
+<body>
+<p id="test"></p>
+
+</body>
+
+</html>

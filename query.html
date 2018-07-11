@@ -1,0 +1,364 @@
+<html>
+<head>
+   <meta charset="utf-8"/>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+	
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.16/css/jquery.dataTables.min.css"/>
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+ 
+	<script type="text/javascript" src="https://cdn.datatables.net/1.10.16/js/jquery.dataTables.min.js"></script>
+	
+	<script src="elasticsearch-js-14.2.1\elasticsearch-js\elasticsearch.min.js"></script>
+	<script src="https://d3js.org/d3.v4.min.js"></script>
+	<script src="C:\Users\manoj.madala\Desktop\Test-Resizable\d3pie.js"></script>
+	<script>
+	var els=new elasticsearch.Client({host:
+	[{	
+	host:'elasticsearch05.db.shared.int.sv2.247-inc.net',
+	weight:100,
+	port:9200,	
+	sniffOnStart:true
+	}]
+	});
+	
+	$(document).ready(function() {
+
+} );
+	
+	var map;
+	
+	</script>
+	
+</head>
+
+<body>
+<div id="mypie1" style="width:50%;float:left;height:400px"></div>
+<div id="mypie2" style="width:50%;height:400px;float:left"></div>
+ <table id="report" class="display" style="width:100%">
+ <caption>Incidnets Report	</caption>
+ <thead>
+<tr>
+                <th style="width:63px">Issue ID</th>
+                <th>Product</th>
+                <th>Component</th>
+				<th >Client</th>
+                <th>Severity</th>
+                <th>Status</th>
+                <th style="width:90px">Created </th>
+				<th>Environment</th>
+				<th>ReportedBy</th>
+            </tr>
+			<tbody id="tabblebody">
+			
+			</tbody>
+			<tfoot>
+            <tr>
+                <td>Issue ID</td>
+                <td>Product</td>
+                <td>Component</td>
+				<td>Client</td>
+                <td>Severity</td>
+                <td>Status</td>
+                <td>Created</td>
+				<td>Environment</td>
+				<td>ReportedBy</td>
+            </tr>
+        </tfoot>
+ </thead>
+ </table>
+
+
+ 
+ <script>
+ var test;
+ var records;
+function entry(label,value)
+{
+   this.label=label;
+   this.value=value;
+   
+}
+function Dataentry(id,product,component,client,severity,status,created,environment,reportedby)
+{
+   this.id=id;
+   this.product=product;
+   this.component=component;
+   this.client=client;
+   this.severity=severity;
+   this.status=status;
+   this.created=created;
+   this.environment=environment;
+   this.reportedby=reportedby;
+   
+}
+var products={
+index:"jiracloud",
+type:"prodincidents",
+body:{
+"size": 0,
+  "query": { 
+    "bool": { 
+      "must": [
+ 
+        
+		{ "match":{"SEVERITY":	{"query":"S1 S2",
+					"operator":"or"
+					}	
+		
+		}}
+		
+		
+	 ]
+    }
+  },
+
+"aggs" : {
+    "langs" : {
+        "terms" : 
+		{ 
+		"field" : "PRODUCT.keyword",
+		"order" : { "_term" : "asc" },
+		"size" : 500 
+		},
+		"aggs" :
+		{
+		"type_count" : 
+		{
+            "cardinality" :
+			{
+                "field" : "ISSUE_ID"
+            }
+        }
+	
+		}
+		
+			}
+		}
+}
+}
+;
+var pie;
+
+		
+
+els.search(products,function(err,res){
+var m=new Array();
+var response=res;
+for(var i=0;i<response.aggregations.langs.buckets.length;i++){
+m.push(new entry(response.aggregations.langs.buckets[i].key,response.aggregations.langs.buckets[i].type_count.value));}
+
+var product_count = function (context) {
+    var label = context.label;
+	var value = context.value;
+
+    
+    
+    return label +"("+value+")";
+};
+
+
+ pie= new d3pie("mypie1", {
+	header: {
+		title: {
+			text: "Product"
+		}
+	},
+		
+	size: {
+    canvasHeight: parseInt(d3.select("#mypie1").style("height")),
+    canvasWidth: (parseInt(d3.select("body").style("width"))*parseInt(d3.select("#mypie1").style("width")))/100,
+	pieOuterRadius:"120"
+  },
+	labels: {
+            formatter: product_count,
+			inner:{
+			format:""
+			}
+    },
+
+	data: {
+		content: m
+	},
+	callbacks: {
+		onClickSegment: function(a) {
+			//alert("Segment clicked! See the console for all data passed to the click handler.");
+			test=a;
+			/*$("#tabblebody").find('td[class = product]').each(function(item)
+			{
+			var x=$("#tabblebody").find('td[class = product]').eq(item).html();
+			if(x!="Insights")
+			{$("#tabblebody").find('tr').eq(item).remove();
+			}
+			});*/
+			    var response;
+	var product=a.data.label;
+		if(product.includes("[24]7"))
+		{
+		product=product.split("[24]7");
+		product=product[1];
+		product="*"+product;
+		}
+	
+	var query1={
+index:"jiracloud",
+type:"prodincidents",
+size:1000,
+body:{
+"sort" : [
+        { "CREATED_DATE" : {"order" : "desc"}}
+		],
+
+"query":{
+"bool": { 
+			      "must": [
+			 
+			        
+					{ "match":{"SEVERITY":	{"query":"S1 S2",
+								"operator":"or"
+								}	
+					
+					}},
+					{"match":{"PRODUCT":product}}
+					
+					
+				 ]
+
+			}
+}
+
+}
+
+  };
+
+
+els.search(query1,function(err,res)
+{
+console.log(res);
+response=res;
+var unique=0;
+map={};
+var dataTable = $('#report').DataTable({"order": [[ 6, "desc" ]] });
+dataTable.clear();
+
+
+
+ records=new Array();
+for(var i=0;i<response.hits.hits.length;i++){
+if(map[response.hits.hits[i]._source.ISSUE_ID]!=null)
+{
+
+records[map[response.hits.hits[i]._source.ISSUE_ID]].client+=","+response.hits.hits[i]._source.CLIENT;
+}
+else
+{
+map[response.hits.hits[i]._source.ISSUE_ID]=unique;
+unique+=1;
+records.push(new Dataentry(response.hits.hits[i]._id,
+response.hits.hits[i]._source.PRODUCT ,
+response.hits.hits[i]._source.COMPONENT ,
+response.hits.hits[i]._source.CLIENT  ,
+response.hits.hits[i]._source.SEVERITY  ,
+ response.hits.hits[i]._source.STATUS ,
+ response.hits.hits[i]._source.CREATED_DATE  ,
+ response.hits.hits[i]._source.ENVIRONMENT ,
+ response.hits.hits[i]._source.REPORTED_BY 
+));
+}
+}
+
+
+for(var i=0;i<records.length;i++){
+
+/*if(map[response.hits.hits[i]._source.ISSUE_ID]>=0){
+var rowIndex=map[response.hits.hits[i]._source.ISSUE_ID];
+$('#report').find('tbody tr').eq(rowIndex).find("td").each(function(index,item){
+//if(index==0){item.innerHTML+=response.hits.hits[i]._source.ISSUE_ID;}
+console.log("i"+i);
+if(index==3){item.innerHTML+=","+response.hits.hits[i]._source.CLIENT;}
+
+
+return item;
+});
+
+
+
+}
+else{*/
+
+dataTable.row.add([
+'<a href="https://projects.247-inc.com/issues/' + response.hits.hits[i]._id + '">' + records[i].id + '</a>' ,
+records[i].product,
+records[i].component ,
+records[i].client  ,
+records[i].severity  ,
+records[i].status ,
+records[i].created  ,
+records[i].environment ,
+records[i].reportedby  ]).draw();
+//}
+
+}
+
+console.log("unique"+unique);
+console.log("Map"+map);
+
+
+
+
+	
+
+});
+	
+			d3.select("#mypie2").select("svg").remove();
+			var pie2=new d3pie("mypie2",{
+			header: {
+		title: {
+			text: test.data.label+" components"
+		}
+	},size: {
+    canvasHeight: parseInt(d3.select("#mypie2").style("height")),
+    canvasWidth: (parseInt(d3.select("body").style("width")))-((parseInt(d3.select("body").style("width"))*parseInt(d3.select("#mypie1").style("width")))/100),
+	pieOuterRadius:"120"
+  },
+  
+	labels: {
+            inner: {
+            format: "value"
+        }
+    },
+	data: {
+		content: [
+			{ label: "One", value: 5 },
+			{ label: "Two", value: 3 },
+			{ label: "Three", value: 2}
+		]
+	}
+			
+			});
+			
+			//console.log(a);
+			/////////////
+			
+			
+
+	
+			
+			
+		
+	}
+}});
+
+});
+
+
+
+
+	
+
+</script>
+
+</body>
+
+</html>	

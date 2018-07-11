@@ -1,0 +1,226 @@
+<html>
+<head>
+   <meta charset="utf-8"/>
+	<script src="elasticsearch-js-14.2.1\elasticsearch-js\elasticsearch.min.js"></script>
+	<script src="http://d3js.org/d3.v4.min.js"></script>
+	<script>
+	
+	var test;
+	var data=[];
+	var month=[];
+		var width=1000;
+		var height=1000;
+	var els=new elasticsearch.Client({host:
+	[{	
+	host:'elasticsearch05.db.shared.int.sv2.247-inc.net',
+	weight:100,
+	port:9200,	
+	sniffOnStart:true
+	}]
+	});
+els.ping({
+  requestTimeout: 30000,
+}, function (error) {
+  if (error) {
+    console.error('elasticsearch is down');
+  } else {
+    console.log('elasticsearch is up and running');
+  }
+});
+
+
+
+var query1={
+index:"jiracloud",
+type:"prodincidents",
+body:{
+"size": 0,
+  "query": { 
+    "bool": { 
+      "must": [
+ 
+        { "match": { "PRODUCT": "*Chat" }},
+		{ "match":{"SEVERITY":	{"query":"S1 S2",
+					"operator":"or"
+					}	
+		
+		}},
+		{ "match":{"ENVIRONMENT":"Production"}},
+		{ "match":{"REPORTED_BY":
+					{"query":"Client Internal*",
+					"operator":"or"
+					}
+				}
+		}	
+	 ]
+    }
+  },
+
+"aggs" : {
+    "langs" : {
+        "terms" : 
+		{ 
+		"field" : "INCIDENT_MONTH.keyword",
+		"order" : { "_term" : "asc" },
+		"size" : 500 
+		},
+		"aggs" :
+		{
+		"type_count" : 
+		{
+            "cardinality" :
+			{
+                "field" : "ISSUE_ID"
+            }
+        }
+	
+		}
+		
+			}
+		}
+}
+}
+;
+
+
+
+
+els.search(query1,function(err,res)
+{
+test=res;
+console.log(res);
+for(var x=0;x<res.aggregations.langs.buckets.length;x++){
+data.push(res.aggregations.langs.buckets[x].type_count.value);
+var monthRaw=res.aggregations.langs.buckets[x].key.split("-");
+month.push(monthRaw[0]+"-"+monthRaw[2]);
+
+}
+
+
+var area=d3.select("body").append("svg").attr("height",height).attr("width",width).append("g").attr("transform","translate(200,0)");
+
+var scalex=d3.scaleLinear()
+					.domain([0, Math.max.apply(null,data)])
+					.range([0, width/2]);
+		var scaley=d3.scaleLinear()
+					.domain([0,data.length])
+					.range([height/2,0]);
+		var color=d3.scaleLinear()
+					.domain([0,data.length])
+					.range(["darkred","black"]);
+					
+				
+	    		
+        var paragraph = area.selectAll("rect")
+                .data(data)
+				.enter()
+				.append("rect")
+				.on("mouseover", onMouseOver) //Add listener for the mouseover event
+         .on("mouseout", onMouseOut)
+                .attr("width",function (d,i,data) {return scalex(d);})
+				.attr("height",function(d,i,data){return height/(2*data.length);})
+				.attr("y",function(d,i){
+				/*var body = d3.select("body");
+				var svg = body.select("svg");
+				d3.select("svg")
+				.select("g")
+				.select("g:nth-child("+(i+1)+")")
+				.append("text")
+				.text(d)
+				.style("font-size","13px")
+				.attr("x",scalex(d))
+				.attr("y",scaley(i)+((2*height)/(2*data.length))/3)
+				;*/
+				return scaley(i);	
+				})
+				.attr("fill", function(d,i){return color	(d);})
+				.attr("stroke","white")	
+				
+				;
+				
+var text=area.selectAll("text")
+				.data(data)
+				.enter()
+				.append("text")
+				.attr("fill","white")
+				.attr("text-anchor","middle")
+				.attr("font-size","1rem")
+				.attr("x",function(d,i){return scalex(d)-10;})
+				.attr("y",function(d,i){return scaley(i)+(height/(3*data.length));})
+				.text(	function(d,i){return d;});
+				
+		
+var x_axis = d3.axisBottom()
+					.ticks(8)
+                   .scale(scalex);
+		 var y_axis = d3.axisLeft()
+		 .ticks(16)
+		 .scale(scaley)
+		 .tickFormat(function(d,i){
+		  
+             return month[i]
+			 });		
+		area.append("g")
+		.attr("transform","translate(0,"+(height/(2*data.length))/2+")")
+		.call(y_axis)
+		.append("text")
+         .attr("y",-100)
+         .attr("x", -height/4 )
+		 .attr("transform", "rotate(-90)")
+         .attr("text-anchor", "end")
+         .attr("stroke", "black")
+         .text("Incident Month");;
+		
+		area.append("g")
+		.attr("transform","translate(0,"+((height/2)+(height/(2*data.length)))+")")
+		.call(x_axis)
+		.append("text")
+         .attr("y", 50)
+         .attr("x", width/4  )
+         .attr("text-anchor", "end")
+         .attr("stroke", "black")
+         .text("S1 Incidents Chat");
+		
+		function onMouseOver(d, i) {
+        d3.select(this).classed("highlight", true);
+        d3.select(this)
+          .transition()     // adds animation
+          .duration(400)
+          ;}
+		  function onMouseOut(d, i) {
+        d3.select(this).classed("highlight", false);
+        d3.select(this)
+          .transition()     // adds animation
+          .duration(400)
+         ;}
+		  
+		  
+
+
+});
+
+
+
+
+	</script>
+	<style>
+	
+	tfoot input {
+        width: 100%;
+        padding: 3px;
+        box-sizing: border-box;
+    }
+		
+		.highlight {
+            fill: orange;
+        }
+	</style>
+</head>
+
+<body>
+<p id="test"></p>
+
+
+</body>
+
+</html>

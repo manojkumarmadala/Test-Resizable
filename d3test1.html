@@ -1,0 +1,158 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+	<script src="elasticsearch-js-14.2.1\elasticsearch-js\elasticsearch.min.js"></script>
+	<script src="http://d3js.org/d3.v4.min.js"></script>
+
+</head>
+<body>
+    <p></p>
+    <p></p>
+    <p></p>
+
+    <script>
+	var width=500;
+		var height=500;	
+	var z,z1,test;
+	var area=d3.select("body").append("svg").attr("height",height).attr("width",width);
+	var data=[];
+	var els=new elasticsearch.Client({host:
+	[{	
+	host:'elasticsearch05.db.shared.int.sv2.247-inc.net',
+	weight:100,
+	port:9200,	
+	sniffOnStart:true
+	}]
+	});
+els.ping({
+  requestTimeout: 30000,
+}, function (error) {
+  if (error) {
+    console.error('elasticsearch is down');
+  } else {
+    console.log('elasticsearch is up and running');
+  }
+});
+
+
+
+var query1={
+index:"jiracloud",
+type:"prodincidents",
+body:{
+"size": 0,
+"aggs" : {
+    "langs" : {
+        "terms" : { 
+		"field" : "INCIDENT_MONTH.keyword",
+		"order" : { "_term" : "asc" },
+		"size" : 500 
+		}
+    }
+}
+}
+};
+
+els.search(query1,function(err,res){
+z1=res;
+console.log(res.aggregations.langs.buckets)
+for (var x=0;x<res.aggregations.langs.buckets.length;x++){
+
+exec(res.aggregations.langs.buckets[x].key,x);
+}
+
+				
+
+		
+		
+				
+
+});
+
+function exec(key,index){
+
+els.search(queries(key),function(err,res){
+test=res;
+data.push(res.hits.hits.length);
+
+var scalex=d3.scaleLinear()
+					.domain([0, Math.max.apply(null,data)])
+					.range([0, width]);
+		var scaley=d3.scaleLinear()
+					.domain([0,data.length])
+					.range([0,height]);
+		var color=d3.scaleLinear()
+					.domain([0,data.length])
+					.range(["black","red"]);	
+	
+		
+		d3.select("svg").selectAll("g").remove();
+		//var area=d3.select("body").append("svg").attr("height",height).attr("width",width);
+        var paragraph = area.selectAll("rect")
+                .data(data)
+				.enter().append("g")
+				.append("rect")
+                .attr("width",function (d,i,data) {return scalex(d);})
+				.attr("height",function(d,i,data){return height/data.length;})
+				.attr("y",function(d,i){var body = d3.select("body");
+				var svg = body.select("svg");
+				var height=svg.style("height")
+				var x=(parseInt(height)/data.length)*i;
+				var y=((parseInt(height)-100)/data.length)*i;
+						
+				d3.select("body").select("g:nth-child("+index+")").append("text").text(d).attr("x",d*5+10).attr("y",x+4*(100/data.length)).style("color",function(d,i){return color(i);});	return scaley(i);	})
+				.attr("fill", function(d,i){return color(i);})
+				.attr("stroke","white");
+	    
+
+/*
+document.getElementById("test").innerHTML+="S1-Chat for Month "+key+"..count"+res.hits.hits.length+"<br>";
+for(var a=0;a<res.hits.hits.length;a++){
+var vari=res.hits.hits[a];
+document.getElementById("test").innerHTML+="--_id:"+vari._id+"--month:"+vari._source.INCIDENT_MONTH+"--product:"+vari._source.PRODUCT+"--ISSUE_ID:"+vari._source.ISSUE_ID+"--SEV:"+vari._source.SEVERITY+"<br>";
+}
+*/
+
+
+
+});
+}
+function queries(month){
+var a=month.split("-");
+var query={
+index:"jiracloud",
+type:"prodincidents",
+from:0,
+size:1000,
+body:{
+  "query": { 
+    "bool": { 
+      "must": [
+        { "match": { "INCIDENT_MONTH":   "*"+a[2]}}, 
+		{ "match": { "INCIDENT_MONTH":   a[0]+"*"}}, 
+        { "match": { "PRODUCT": "*Chat" }},
+		{ "match":{"SEVERITY":"S1"}}	
+      ]
+    }
+  }
+}
+
+
+};
+return query;}
+
+
+        
+				
+                                
+				
+				 
+	
+	
+	
+				
+		
+    </script>
+</body>
+</html>

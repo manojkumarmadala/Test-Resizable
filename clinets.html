@@ -1,0 +1,506 @@
+<html>
+<head>
+   <meta charset="utf-8"/>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+	
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.16/css/jquery.dataTables.min.css"/>
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+ 
+	<script type="text/javascript" src="https://cdn.datatables.net/1.10.16/js/jquery.dataTables.min.js"></script>
+	
+	<script src="elasticsearch-js-14.2.1\elasticsearch-js\elasticsearch.min.js"></script>
+	<script src="https://d3js.org/d3.v4.min.js"></script>
+	<script src="C:\Users\manoj.madala\Desktop\Test-Resizable\d3pie.js"></script>
+	<script>
+	var els=new elasticsearch.Client({host:
+	[{	
+	host:'elasticsearch05.db.shared.int.sv2.247-inc.net',
+	weight:100,
+	port:9200,	
+	sniffOnStart:true
+	}]
+	});
+	
+	$(document).ready(function() {
+
+} );
+	
+	var map;
+	
+	</script>
+	
+</head>
+
+<body>
+<div id="mypie1" style="width:50%;float:left;height:500px">
+<input type="checkbox" id="s1"name="severity" value="S1" checked> S1
+<input type="checkbox" id="s2" name="severity" value="S2" checked> S2
+<input type="checkbox" id="s3" name="severity" value="S3" > S3</div>
+<div id="mypie2" style="width:50%;height:500px;float:left"></div>
+ <table id="report" class="display" style="width:100%">
+
+ 
+ <thead>
+<tr>
+                <th style="width:63px">Issue ID</th>
+                <th>Product</th>
+                <th>Component</th>
+				<th >Client</th>
+                <th>Severity</th>
+                <th>Status</th>
+                <th style="width:90px">Created </th>
+				<th>Environment</th>
+				<th>ReportedBy</th>
+            </tr>
+			<tbody id="tabblebody">
+			
+			</tbody>
+			<tfoot>
+            <tr>
+                <td>Issue ID</td>
+                <td>Product</td>
+                <td>Component</td>
+				<td>Client</td>
+                <td>Severity</td>
+                <td>Status</td>
+                <td>Created</td>
+				<td>Environment</td>
+				<td>ReportedBy</td>
+            </tr>
+        </tfoot>
+ </thead>
+ </table>
+
+
+ 
+ <script>
+ var test;
+ var records;
+ var dataTable = $('#report').DataTable({"order": [[ 6, "desc" ]] });
+ var clients={};
+ var clientsSorted={};
+ var severity;
+ var pie;
+var pie2;
+
+function entry(label,value)
+{
+   this.label=label;
+   this.value=value;
+   
+}
+function client(client,value)
+{
+this.client=client;
+this.vlaue=value;
+}
+
+
+clients["Capital One"]="CapitalOne";
+clients["Cap1CAAT"]="CapitalOne";
+clients["Capital One Bank"]="CapitalOne";
+clients["Capital One CAAT"]="CapitalOne";
+clients["Capital One Card"]="CapitalOne";
+clients["Capital One Ease"]="CapitalOne";
+clients["CapitalOne"]="CapitalOne";
+clients["CapitalOne Cards"]="CapitalOne";
+clients["AT&T"]="AT&T";
+clients["American Express"]="AmericanExpress";
+clients["United Airlines"]="UnitedAirlines";
+clients["Ford"]="Ford";
+clients["Farmers"]="Farmers";
+clients["Farmers Management"]="Farmers";
+clients["Resolvity"]="Resolvity";
+clients["Avis Budget"]="Avis Budget";
+clients["Hilton"]="Hilton";
+clients["Hitlon"]="Hilton";
+clients["Sears HS"]="Sears";
+clients["Sears HS – USA"]="Sears";
+clients["Sears Online"]="Sears";
+clients["Sears PD"]="Sears";
+clients["Sears"]="Sears";
+clients["Dish"]="Dish";
+clients["British Gas"]="BritishGas";
+clients["BritishGas"]="BritishGas";
+clients["Optus"]="Optus";
+clients["Optus - Australia"]="Optus";
+clients["Optus AIVA"]="Optus";
+clients["Optus Customer Service – BLR"]="Optus";
+clients["Sirius XM"]="Sirius XM";
+clients["BestBuy"]="BestBuy";
+clients["Grainger"]="Grainger";
+clients["Argos"]="Argos";
+clients["Discover"]="Discover";
+clients["Delta Airlines"]="DeltaAirlines";
+
+clientGraph();
+
+$('#s1').change(function() {clientGraph()});
+$('#s2').change(function() {clientGraph()});
+$('#s3').change(function() {clientGraph()});
+
+
+function Dataentry(id,product,component,client,severity,status,created,environment,reportedby)
+{
+   this.id=id;
+   this.product=product;
+   this.component=component;
+   this.client=client;
+   this.severity=severity;
+   this.status=status;
+   this.created=created;
+   this.environment=environment;
+   this.reportedby=reportedby;
+   
+}
+function clientGraph(){
+severity="";
+clientsSorted={};
+if($('#s1').is(":checked")){severity+=" S1"}
+if($('#s2').is(":checked")){severity+=" S2"}
+if($('#s3').is(":checked")){severity+=" S3"}
+
+
+var clientQuery={
+index:"jiracloud",
+type:"prodincidents",
+body:{
+  "query": { 
+    "bool": { 
+      "must": [
+ 
+        
+		{ "match":{"SEVERITY":	{"query":severity,
+					"operator":"or"
+					}	
+		
+		}}
+		
+		
+	 ]
+    }
+  },
+"aggs" : {
+    "langs" : {
+        "terms" : 
+		{ 
+		"field" : "CLIENT.keyword",
+		"order" : { "_term" : "asc" },
+		"size" : 500 
+		},
+		
+		
+			}
+		}
+}
+}
+;
+
+
+		
+
+els.search(clientQuery,function(err,res){
+var m=new Array();
+for (var i=0;i<res.aggregations.langs.buckets.length;i++){
+						  // console.log(res.aggregations.langs.buckets[i].key+" : "+res.aggregations.langs.buckets[i].doc_count);
+					if(clients[res.aggregations.langs.buckets[i].key]!=null)
+					{
+						
+						if(clientsSorted[clients[res.aggregations.langs.buckets[i].key]]!=null){
+						var value=res.aggregations.langs.buckets[i].doc_count;
+						clientsSorted[clients[res.aggregations.langs.buckets[i].key]]+=value;
+						}
+						else
+						{
+						clientsSorted[clients[res.aggregations.langs.buckets[i].key]]=res.aggregations.langs.buckets[i].doc_count
+						}
+						
+					}	  
+						  
+						 
+						   }
+						   
+						   Object.keys(clientsSorted).forEach(function(key) {
+    m.push(new entry(key,clientsSorted[key]));
+});
+
+var product_count = function (context) {
+    var label = context.label;
+	var value = context.value;
+
+    
+    
+    return label +"("+value+")";
+};
+
+d3.select("#mypie1").select("svg").remove();
+ pie= new d3pie("mypie1", {
+	header: {
+		title: {
+			text: "Client"
+		}
+	},
+		
+	size: {
+    canvasHeight: parseInt(d3.select("#mypie1").style("height")),
+    canvasWidth: (parseInt(d3.select("body").style("width"))*parseInt(d3.select("#mypie1").style("width")))/100,
+	pieOuterRadius:"130"
+  },
+	labels: {
+            formatter: product_count,
+			inner:{
+			format:""
+			}
+    },
+
+	data: {
+		content: m
+	},
+	callbacks: {
+		onClickSegment: function(a) {
+tabularData(a);
+productGraph(a);
+//////////////////////////////////////////////
+
+
+	}
+}
+	
+});
+
+});
+}
+
+function productGraph(a){
+			var newclient;
+	var client_new=a.data.label;
+	   Object.keys(clients).forEach(function(key) {
+    //m.push(new entry(key,clients[key]));
+	
+	if(clients[key]==client_new){
+	var keys=key.split(" ");
+	
+	
+	newclient+=" "+keys[0];}
+});
+	var products = {
+index:"jiracloud",
+type:"prodincidents",
+body:{
+		
+		"query" : {
+			"bool" : {
+				"must" : [
+
+				{
+					"match" : {
+						"SEVERITY" : {
+							"query" : severity,
+							"operator" : "or"
+						}
+
+					}
+				}, {
+					"match" : {
+						"CLIENT" : {
+							"query" : newclient,
+							"operator" : "or"
+						}
+					}
+				}
+
+				]
+			}
+		},
+
+		"aggs" : {
+			"langs" : {
+				"terms" : {
+					"field" : "PRODUCT.keyword",
+					"order" : {
+						"_term" : "asc"
+					},
+					"size" : 500
+				}
+
+			}
+		}
+	}
+	};
+	
+	els.search(products,function(err,res){
+			var product= new Array();
+			console.log(res);
+			for (var i = 0; i < res.aggregations.langs.buckets.length; i++) {
+						product.push(new entry(
+										res.aggregations.langs.buckets[i].key,
+										res.aggregations.langs.buckets[i].doc_count));
+					}
+			d3.select("#mypie2").select("svg").remove();
+			var pie2=new d3pie("mypie2",{
+			header: {
+		title: {
+			text: test.data.label+"-Products"
+		}
+	},size: {
+    canvasHeight: parseInt(d3.select("#mypie2").style("height")),
+    canvasWidth: (parseInt(d3.select("body").style("width")))-((parseInt(d3.select("body").style("width"))*parseInt(d3.select("#mypie1").style("width")))/100),
+	pieOuterRadius:"120"
+  },
+  
+	labels: {
+            inner: {
+            format: "value"
+        }
+    },
+	data:{
+		content: product
+	}
+			
+			});});
+			
+			
+			
+			
+
+	
+			
+			
+		
+}
+
+function tabularData(a){
+			//alert("Segment clicked! See the console for all data passed to the click handler.");
+			test=a;
+			/*$("#tabblebody").find('td[class = product]').each(function(item)
+			{
+			var x=$("#tabblebody").find('td[class = product]').eq(item).html();
+			if(x!="Insights")
+			{$("#tabblebody").find('tr').eq(item).remove();
+			}
+			});*/
+			    var response;
+				var newclient;
+	var client_new=a.data.label;
+	   Object.keys(clients).forEach(function(key) {
+    //m.push(new entry(key,clients[key]));
+	
+	if(clients[key]==client_new){
+	var keys=key.split(" ");
+	
+	
+	newclient+=" "+keys[0];}
+});
+	
+	
+		
+	
+	var query1={
+index:"jiracloud",
+type:"prodincidents",
+size:1000,
+body:{
+"sort" : [
+        { "CREATED_DATE" : {"order" : "desc"}}
+		],
+
+"query":{
+"bool": { 
+			      "must": [
+			 
+			        
+					{"match":{"SEVERITY":{"query":severity,
+								"operator":"or"
+								}}},
+					{"match":{"CLIENT":{"query":newclient,
+								"operator":"or"
+								}}}
+								
+					
+					
+				 ]
+
+			}
+}
+
+}
+
+  };
+
+
+els.search(query1,function(err,res)
+{
+//console.log(res);
+response=res;
+var unique=0;
+map={};
+
+dataTable.clear();
+
+
+
+ records=new Array();
+for(var i=0;i<response.hits.hits.length;i++){
+
+
+records.push(new Dataentry(response.hits.hits[i]._id,
+response.hits.hits[i]._source.PRODUCT ,
+response.hits.hits[i]._source.COMPONENT ,
+response.hits.hits[i]._source.CLIENT  ,
+response.hits.hits[i]._source.SEVERITY  ,
+ response.hits.hits[i]._source.STATUS ,
+ response.hits.hits[i]._source.CREATED_DATE  ,
+ response.hits.hits[i]._source.ENVIRONMENT ,
+ response.hits.hits[i]._source.REPORTED_BY 
+));
+
+}
+
+
+for(var i=0;i<records.length;i++){
+var id = records[i].id;
+						var url;
+						if (id.length > 15) {
+							id = id.split("CLOUD");
+							id = "CLOUD" + id[2];
+						}
+						if (id.includes("CLOUD")) {
+							url = "https://247inc.atlassian.net/browse/" + id;
+						} else
+							url = "https://projects.247-inc.com/issues/" + id
+
+dataTable.row.add([
+'<a href="' + url + '" target="_blank">' + id + '</a>',
+records[i].product,
+records[i].component ,
+records[i].client  ,
+records[i].severity  ,
+records[i].status ,
+records[i].created  ,
+records[i].environment ,
+records[i].reportedby  ]).draw();
+//}
+
+}
+
+
+
+
+
+
+	
+
+});}
+
+
+
+
+	
+
+</script>
+
+</body>
+
+</html>	

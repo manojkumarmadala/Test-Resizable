@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+<head>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/elasticsearch/14.2.1/elasticsearch.min.js"></script>
+</head>
+<body>
+    <p></p>
+    <p></p>
+    <p></p>
+
+    <script>
+        var data = [1,2,3,4,6,6,7,8,34,23,42,234,4,4,4,4,4,4];
+		
+		var area=d3.select("body").append("svg").attr("height",600).attr("style","width:100%");
+        var paragraph = area.selectAll("rect")
+                .data(data)
+				.enter().append("g")
+				.append("rect")
+                .attr("width",function (d,i,data) {return d*5;})
+				.attr("height",function(d,i,data){
+				var body = d3.select("body");
+				var svg = body.select("svg");
+				var height=svg.style("height");
+				height=(parseInt(height)-100)/data.length;
+				
+				return height;
+				})
+				.attr("y",function(d,i){
+				var body = d3.select("body");
+				var svg = body.select("svg");
+				var height=svg.style("height")
+				var x=(parseInt(height)/data.length)*i;
+				var y=((parseInt(height)-100)/data.length)*i;
+				
+				
+				d3.select("body").selectAll("g").append("text").text(d).attr("x",d*5+10).attr("y",x+4*(100/data.length)).attr("style","fill:green");
+				
+				return x;
+				
+				})
+				.attr("fill",function(d){return "navyblue";});
+				
+				
+                                
+				
+				 var body = d3.select("body");
+				var svg = body.select("svg");
+				var width=svg.style("width")
+	
+	
+	
+				
+		
+    </script>
+</body>
+</html>

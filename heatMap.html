@@ -1,0 +1,294 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.16/css/jquery.dataTables.min.css"/>
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+<link href='https://fonts.googleapis.com/css?family=Montserrat:400,700'
+rel='stylesheet' type='text/css'>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+
+<script type="text/javascript" src="https://cdn.datatables.net/1.10.16/js/jquery.dataTables.min.js"></script>
+
+<script src="elasticsearch-js-14.2.1\elasticsearch-js\elasticsearch.min.js"></script>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="d3pie.js"></script>	
+<title>HeatMap</title>
+<style type="text/css">
+	
+.range {
+    margin: 0 !important;
+}
+
+.block {
+    display: inline-block;
+    height: 10px;
+    margin-right: .5em;
+    width: 20px;
+}
+
+.legend {
+    margin-right:20px;
+}
+
+.range1 { background: #4c8448;}
+.range2 { background: #82c77e;}
+.range3 { background: #b2c77e;}
+.range4 { background: #f5cf47;}
+.range5 { background: #ffa500;}
+.range6 { background: #ff8100;}
+.range7 { background: #ff4700;}
+.range8 { background: #f50404;}
+
+}
+
+</style>
+</head>
+
+<body>
+
+	 <div id="heatmap" style="float:left">
+	 
+  </div>
+  <div style="float:left;padding-top:200px;">
+	  
+     <div > <p class="range"><span class="block range1"></span>0</p> </div>
+     <div > <p class="range"><span class="block range2"></span>1-2</p> </div>
+     <div > <p class="range"><span class="block range3"></span>2-5</p> </div>
+     <div > <p class="range"><span class="block range4"></span>5-10</p> </div>
+     <div > <p class="range"><span class="block range5"></span>10-30</p> </div>
+     <div > <p class="range"><span class="block range6"></span>30-50</p> </div>
+     <div > <p class="range"><span class="block range7"></span>50-100</p> </div>
+     <div > <p class="range"><span class="block range8"></span>>100</p> </div>
+	</div>
+
+<script >
+var gte=new Date(new Date().getFullYear(), 0, 1);
+var lte=new Date();
+
+var heatmap={
+	"size" : 0,
+		"query" : {
+			"bool" : {
+				"must" : [
+
+				{
+					"match" : {
+						"PRODUCT" : {"query":"Instrumentation Insights DPX TIE Pulse",
+							"operator":"or"
+						}	
+
+					}
+				}
+
+				],
+				
+				"filter" : [ {
+					"range" : {
+						"CREATED_DATE" : {
+							"gte" : "now-5M/M",
+							"lte" : "now",
+							"format" : "yyyy-MM-dd"
+						}
+					}
+				} ]
+				
+			}
+		},
+		"aggs" : {
+				"client":{
+					"terms" :  {
+					"field" : "CLIENT.keyword",
+					"order" : {
+						"_term" : "asc"
+					},
+					"size" : 500
+				},
+					"aggs":{
+					"month" : {
+						"terms" : {
+							"field" : "INCIDENT_MONTH.keyword",
+							"min_doc_count": 0,
+							"order" : {
+						"_term" : "asc"
+					},
+					"size":500						}
+					}
+					
+					
+					
+					}
+
+				}
+
+			}
+		
+		
+		
+		}
+		function dataentry(client,month,count)
+{
+   this.client=client;
+   this.month=month;
+   this.count=count;
+   
+}
+var m;
+		
+		$.ajax({   url: 'http://elasticsearch05.db.shared.int.sv2.247-inc.net:9200/jiracloud/prodincidents/_search?pretty=true'
+                     , method: 'POST'
+                     , data : JSON.stringify(heatmap)
+                     , dataType : 'json'
+					 , contentType: "application/x-www-form-urlencoded; charset=utf-8"
+                     
+                     , success: function(json, statusText, xhr) {
+					 
+							result = json;
+							console.log(result);
+							m=new Array();
+							var map={};
+							//var area=d3.select("body").append("svg").attr("height",height).attr("width",width).append("g").attr("transform","translate(200,0)");
+							for(var i=0;i<result.aggregations.client.buckets.length;i++){
+							
+							for(var j=result.aggregations.client.buckets[i].month.buckets.length-6;j<result.aggregations.client.buckets[i].month.buckets.length;j++){
+
+								var month=result.aggregations.client.buckets[i].month.buckets[j].key.split("-");
+
+							m.push(new dataentry(result.aggregations.client.buckets[i].key,month[0]+"-"+month[2],result.aggregations.client.buckets[i].month.buckets[j].doc_count));
+							
+							}
+							m.push(new dataentry(result.aggregations.client.buckets[i].key,"Total",result.aggregations.client.buckets[i].doc_count));
+							
+							
+							}
+							
+							
+							for(var k=0;k<m.length;k++){
+							//console.log(m[k].month);
+							if(map[m[k].month]==null){map[m[k].month]=m[k].count;}
+							else map[m[k].month]+=m[k].count;
+							}
+							var value;
+								Object.keys(map).forEach(function(key) {
+									value = map[key];
+									m.push(new dataentry("Total",key,value));
+									//console.log(value);
+									//console.log(key);
+								});
+						generateHeatMap(m);
+						   }
+                     , error: function(xhr, message, error) {
+                           console.error("Error while loading data from ElasticSearch", message);
+                            alert("No Data Available.Check for Network connectivity");
+						   showError(error);
+                      }
+            });
+			
+			function generateHeatMap(data)
+			{
+			//console.log(data);
+			var width;
+			var height;
+			var cellsize_x=60;
+			var cellsize_y=20;
+			var item_x=[];
+			var item_y=[];
+			var x_scale;
+			var y_scale;
+			var color_scale;
+			var x_axis;
+			var y_axis;
+
+			
+			
+			for(var i=0;i<data.length;i++){
+			item_x.push(data[i].month);
+			item_y.push(data[i].client);}
+			
+			
+			item_x=d3.set(item_x).values();
+			item_y=d3.set(item_y).values();
+			x_scale = d3.scalePoint()
+						.domain(item_x)
+						.range([0, (item_x.length-1) * cellsize_x]);
+			y_scale = d3.scalePoint()
+						.domain(item_y)
+						.range([0, (item_y.length-1) * cellsize_y]);
+					//console.log(item_x);
+
+			color_scale= d3.scaleThreshold()
+    .domain([1,2,5,10,30,50, 100,5000])
+    .range(["#4c8448", "#82c77e","#b2c77e","#f5cf47", "#ffa500","#ff8100","#ff4700","#f50404","#fff"]);			
+			x_axis = d3.axisTop()
+					.scale(x_scale)
+					.tickFormat(function (d,i) {
+									return item_x[i];});
+					
+	        y_axis = d3.axisLeft()
+					.scale(y_scale)
+					.tickFormat(function (d,i) {
+									return item_y[i];});
+									
+		
+			width=item_x.length * cellsize_x+200;
+			height=item_y.length * cellsize_y+200;
+
+				
+			var area=d3.select("#heatmap").append("svg").attr("height",height).attr("width",width).append("g").attr("transform","translate(150,100)");
+					
+			area.selectAll("rect")
+				.data(data)
+				.enter()
+				.append("rect")
+				.attr("width",function(d,i,data){return cellsize_x;})
+				.attr("height",function(d,i,data){return cellsize_y;})
+				.attr("x",function(d){return x_scale(d.month);})
+				.attr("y",function(d){return y_scale(d.client);})
+				.attr("fill",function(d){return color_scale(d.count);})
+				//console.log(x_scale("2017-I-September"));
+
+			area.selectAll("text")
+				.data(data)
+				.enter()
+				.append("text")
+    .attr("x", function(d) { return x_scale(d.month)+(cellsize_x*2)/5; })
+    .attr("y", function(d) { return y_scale(d.client)+(cellsize_y/2);})
+    .attr("dy", ".35em")
+    .text(function(d) { return d.count; });
+
+    area.append("text")
+     	 .attr("x",(item_x.length * cellsize_x)/2)
+     	 .attr("y",item_y.length * cellsize_y+50)
+     	 .attr("text-anchor", "middle")  
+        .style("font-size", "16px") 
+        .text("Heatmap DataAnalytics pillar");
+
+
+    area.append("g")
+        .attr("class", "y axis")
+        .call(y_axis)
+        .selectAll('text')
+        .attr('font-weight', 'normal')
+        .attr('transform',"translate(0,"+cellsize_y/2+")");
+
+     
+
+    area.append("g")
+        .attr("class", "x axis")
+        .call(x_axis)
+        .selectAll('text')
+        .attr('font-weight', 'normal')
+        .style("text-anchor", "start")
+        .attr("dx", ".8em")
+        .attr("dy", ".5em")
+        .attr('transform',"translate("+cellsize_x/2+",0) rotate(-45)");
+			
+			}
+
+</script>
+</body>
+</html>

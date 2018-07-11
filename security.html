@@ -1,0 +1,520 @@
+<html>
+<head>
+   <meta charset="utf-8"/>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+	
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.16/css/jquery.dataTables.min.css"/>
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+<link href='https://fonts.googleapis.com/css?family=Montserrat:400,700'
+	rel='stylesheet' type='text/css'>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+ 
+	<script type="text/javascript" src="https://cdn.datatables.net/1.10.16/js/jquery.dataTables.min.js"></script>
+	
+	<script src="elasticsearch-js-14.2.1\elasticsearch-js\elasticsearch.min.js"></script>
+	<script src="https://d3js.org/d3.v4.min.js"></script>
+	<script src="d3pie.js"></script>
+
+</head>
+
+<body  style="font: 14px/1 Montserrat;">
+
+<div id ="filters"style="width:13%;float:left;height:100%;border-right:2px solid #dddada">
+<div style=" font-size: 15px;color:orange ; margin-bottom: 20px;padding-left:10%;padding-top:20px; height: 16px; width: 100%;" >Fliter By</div>
+<br>
+<div style="font-size: 14px;font-weight:bold;">Date range</div>
+<br>
+<input style="width: 100%;border-radius:3px;height:25px;"  type="date" 
+											 id="from"/></tr>
+<input style="width: 100%;border-radius:3px;height:25px;" type="date"  id="to"/>
+											<br><br>
+<div style="font-size: 14px;font-weight:bold;">Priority</div>
+<br>
+<div style="padding-left:25px;"><input type="checkbox" id="p0" name="priority" value="P0" checked>P0</input></div>
+<div style="padding-left:25px;"><input type="checkbox" id="p1" name="priority" value="P1" checked>P1</input></div>
+<div style="padding-left:25px;"><input type="checkbox" id="p2" name="priority" value="P2" checked>P2</input></div>
+<div style="padding-left:25px;"><input type="checkbox" id="p3" name="priority" value="P3" checked>P3</input></div>
+<div style="padding-left:25px;"><input type="checkbox" id="p4" name="priority" value="P4" checked>P4</input></div>
+
+
+</div>
+</div>
+<div style="width:87%;float:right;padding-top:8px">
+<div id="mypie1" style="width:50%;float:left;height:400px"></div>
+<div id="mypie2" style="width:50%;height:400px;float:left"></div>
+<div align='center' class='title'
+								Style='background-color: #dddada; font-weight: bold; font-size: 16px; font-; margin-bottom: 10px; height: 16px; width: 100%; float: left; clear: left;'>
+								List of Incidents</div>
+ <table id="report" class="display" style="width:100%">
+ <caption>Incidnets Report	</caption>
+ <thead>
+<tr>
+                <th >Issue ID</th>
+                <th>Product</th>
+                <th>Project</th>
+				<th >Priority</th>
+                <th>Status</th>
+                <th >Created </th>
+                <th>SLA-Breached</th>
+				<th>Aging(Days)</th>
+				
+            </tr>
+			<tbody id="tabblebody">
+			
+				</tbody>
+			<tfoot>
+            <tr>
+                <td>Issue ID</td>
+                <td>Product</td>
+                <td>Project</td>
+				<td>Priority</td>
+                <td>Status</td>
+                <td>Created</td>
+                <td>SLA-Breached</td>
+				<td>Aging(Days)</td>
+				
+            </tr>
+        </tfoot>
+ </thead>
+ </table>
+</div>
+
+ <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+ <script>
+ 
+ document.getElementById("from").valueAsDate = new Date(new Date().getFullYear(), 0, 2);
+ //console.log(new Date(new Date().getFullYear(), 0, 1));
+ document.getElementById("to").valueAsDate = new Date();
+
+ 
+ 
+ var fixmeTop = $('#filters').offset().top;       // get initial position of the element
+
+$(window).scroll(function() {                  // assign scroll event listener
+
+    var currentScroll = $(window).scrollTop(); // get current position
+
+    if (currentScroll >= fixmeTop) {           // apply position: fixed if you
+        $('#filters').css({                      // scroll to that element or below it
+            position: 'fixed',
+            top: '0',
+            left: '0'
+        });
+    } else {                                   // apply position: static
+        $('#filters').css({                      // if you scroll above it
+            position: 'static'
+        });
+    }
+
+});
+$("#from").on('change', function() {securityData()});
+$("#to").on('change', function() {securityData()});
+$('#p0,#p1,#p2,#p3,#p4').change(function() {securityData()});
+
+ 
+ var test;
+ var records;
+ var elk="http://elasticsearch05.db.shared.int.sv2.247-inc.net:9200"
+ var dataTable = $('#report').DataTable({"order": [[ 5, "desc" ]] });
+ var priority;
+ var gte;
+ var lte;
+ var pie;
+function entry(label,value)
+{
+   this.label=label;
+   this.value=value;
+   
+}
+function Dataentry(id,product,project,priority,status,created,sla,aging)
+{
+   this.id=id;
+   this.product=product;
+   this.project=project;
+   this.priority=priority;
+   this.status=status;
+   this.created=created;
+   this.sla=sla;
+   this.aging=aging;
+   
+}
+securityData();
+
+/*
+{ "match":{"Priority ":	{"query":priority ,
+					"operator":"or"
+					}	
+		
+		}},
+*/
+
+function securityData(){
+priority=[];
+if($('#p0').is(":checked")){priority.push("Blocker(P0)")}
+if($('#p1').is(":checked")){priority.push("Critical(P1)")}
+if($('#p2').is(":checked")){priority.push("High(P2)")}
+if($('#p3').is(":checked")){priority.push("Medium(P3)")}
+if($('#p4').is(":checked")){priority.push("Low(P4)")}
+dataTable.clear().draw();
+
+	gte = document.getElementById("from").value;
+	lte = document.getElementById("to").value;
+	if (gte > new Date()) {
+		alert("No data available yet");
+		gte = "2017-01-01";
+		document.getElementById('from').value = "2017-01-01";
+	}
+	
+var security=
+ {
+"size":1000,
+"query":{
+	"bool":{
+		"must":[
+		
+		{"match":{
+		"DataSource":"JIRA"
+		}
+		
+		},
+		{"match":{
+		"Project":"*Core"
+		}
+		
+		}
+		],
+		"filter" : [ {
+					"range" : {
+						"CreatedDate" : {
+							"gte" : gte,
+							"lte" : lte,
+							"format" : "yyyy-MM-dd"
+						}
+					}
+				} ]
+		
+		}
+},
+ "aggs" : {
+	                "langs":{                   
+					"terms" :  {
+	                    "field" : "Priority.keyword",
+					    "include":priority,
+	                 
+	                    "order" : {
+	                        "_term" : "asc"
+	                    },
+	                    "size" : 500
+	                }
+
+	                }
+
+	            }
+
+
+};
+
+
+
+		
+
+$.ajax({
+				url : elk + '/jirasecurity/prodincidents/_search?pretty=true',
+				method : 'POST',
+				data : JSON.stringify(security),
+				dataType : 'json',
+				contentType : "application/x-www-form-urlencoded; charset=utf-8"
+
+				,	
+				success : function(json, statusText, xhr) {
+var m=new Array();
+var response=json;
+//console.log(res);
+for(var i=0;i<response.aggregations.langs.buckets.length;i++){
+m.push(new entry(response.aggregations.langs.buckets[i].key,response.aggregations.langs.buckets[i].doc_count));}
+
+var product_count = function (context) {
+    var label = context.label;
+	var value = context.value;
+
+    
+    
+    return label +"("+value+")";
+};
+d3.select("#mypie1").select("svg").remove();
+document.getElementById('mypie2').innerHTML="";
+
+ pie= new d3pie("mypie1", {
+	header : {
+							title : {
+								text : "Incidents by Priority",
+								font:     "Montserrat",
+								fontSize : 15,
+								
+							},
+							location:"top-left"
+						},
+						footer: {
+							text: 	  "Click on segment or label to drill further",
+							color:    "#5a5a5a",
+							fontSize: 13,
+							font:     "Montserrat",
+							location: "bottom-left"
+						},
+		
+	size: {
+    canvasHeight: parseInt(d3.select("#mypie1").style("height")),
+    canvasWidth: (parseInt(d3.select("body").style("width"))*parseInt(d3.select("#mypie1").style("width")))/100,
+	pieOuterRadius:"110"
+  },
+	labels: {
+            formatter: product_count,
+			inner:{
+			format:""
+			}
+    },
+
+	data: {
+		content: m
+	},
+	callbacks: {
+		onClickSegment: function(a) {
+	DisplayData(a);
+	agingGraph(a);
+	
+		
+	}
+}});
+
+}
+});}
+
+function DisplayData(a){
+		
+		
+			
+			 
+	var response;
+	var query1={
+"size":1000,
+"sort" : [
+        { "CreatedDate" : {"order" : "desc"}}
+		],
+
+"query":{
+"bool": { 
+			      "must": [
+			 
+			        
+					{"match":{"Project":"*Core"}},
+					{"match":{"Priority":a.data.label}},
+					{"match":{"DataSource":"JIRA"}}
+					
+					
+				 ],
+				 "filter" : [ {
+					"range" : {
+						"CreatedDate" : {
+							"gte" : gte,
+							"lte" : lte,
+							"format" : "yyyy-MM-dd"
+						}
+					}
+				} ]
+
+			}
+}
+
+
+
+  };
+
+$.ajax({
+				url : elk + '/jirasecurity/prodincidents/_search?pretty=true',
+				method : 'POST',
+				data : JSON.stringify(query1),
+				dataType : 'json',
+				contentType : "application/x-www-form-urlencoded; charset=utf-8"
+
+				,	
+				success : function(json, statusText, xhr) {
+		//		console.log(query1)
+//console.log(json);
+response=json;
+
+
+dataTable.clear();
+
+
+
+ records=new Array();
+for(var i=0;i<response.hits.hits.length;i++){
+
+
+var slaBreached=response.hits.hits[i]._source.SLABreachedMetric;
+if(slaBreached.includes("SLA")){slaBreached=slaBreached.split("-")[1]}else {slaBreached="None"}
+
+records.push(new Dataentry(response.hits.hits[i]._id,
+response.hits.hits[i]._source.Product ,
+response.hits.hits[i]._source.Project ,
+response.hits.hits[i]._source.Priority  ,
+ response.hits.hits[i]._source.Status ,
+ response.hits.hits[i]._source.CreatedDate.split("T")[0]  ,
+ slaBreached ,
+ response.hits.hits[i]._source.Aging_days
+));
+}
+
+
+for(var i=0;i<records.length;i++){
+
+
+dataTable.row.add([
+'<a href="https://247inc.atlassian.net/browse/' + response.hits.hits[i]._id + '">' + records[i].id + '</a>' ,
+records[i].product,
+records[i].project ,
+records[i].priority  ,
+records[i].status  ,
+records[i].created ,
+records[i].sla  ,
+records[i].aging ]).draw();
+
+}
+
+}});
+		}
+		
+		
+function agingGraph(a) {
+	color=a.segment.attributes.style.value.split("fill:")[1];
+	color=color.substring(1,color.length-1);	
+
+
+	var m = new Array();
+	var aging = {
+
+			"size" : 1000,
+			"query" : {
+				"bool" : {
+					"must" : [
+
+					{"match":{"Project":"*Core"}},
+					{"match":{"Priority":a.data.label}},
+					{"match":{"DataSource":"JIRA"}}
+
+					],
+					 "filter" : [ {
+					"range" : {
+						"CreatedDate" : {
+							"gte" : gte,
+							"lte" : lte,
+							"format" : "yyyy-MM-dd"
+						}
+					}
+				} ]
+				}
+			},
+	"aggs" : {
+	            "langs" : {
+	                
+					"terms" : {
+	                    "field" : "SLABreachedMetric.keyword",	                    
+	                    "size" : 500
+	                },
+	                "aggs" : {
+	                "type1":{                   
+					"terms" :  {
+	                    "field" : "Aging_group.keyword",
+	                    "min_doc_count": 0,	                    
+	                    "order" : {
+	                        "_term" : "asc"
+	                    },
+	                    "size" : 500
+	                }
+
+	                }
+
+	            }
+	        }
+	    }
+		};
+		//console.log(aging);
+		$.ajax({
+					url : elk+'/jirasecurity/prodincidents/_search?pretty=true',
+					method : 'POST',					
+					data : JSON.stringify(aging),
+					dataType : 'json',
+					contentType : "application/x-www-form-urlencoded; charset=utf-8",
+					success : function(json, statusText, xhr) {
+						var month = new Array();
+						var components_count = new Array();
+						var components_map = {};
+
+						var rgb = new Array();
+						var response = json;
+						//console.log(response);
+						var opacity="1.0";	
+						
+						
+						//Getting the components for the selected products and feeding to the plotly graph
+						
+						for (var i = 0; i < response.aggregations.langs.buckets.length; i++) {
+						if(response.aggregations.langs.buckets[i].key=="-"){components_map["name"]="None"}
+						else{
+						components_map["name"]=response.aggregations.langs.buckets[i].key;}
+						components_map["type"]="bar";
+						for(var j=0; j<response.aggregations.langs.buckets[i].type1.buckets.length; j++){
+						if(response.aggregations.langs.buckets[i].type1.buckets[j].key=="None"){month.push("0d");}
+					else{	month.push(response.aggregations.langs.buckets[i].type1.buckets[j].key+"d");}
+							//console.log(response.aggregations.langs.buckets[i].type1.buckets[j].key);
+							components_count.push(response.aggregations.langs.buckets[i].type1.buckets[j].doc_count);										
+						
+						}						
+						components_map["x"]=month;
+						components_map["y"]=components_count;
+						
+						//components_map["opacity"]=opacity;
+						test=components_map;
+						rgb["color"]=color;
+						//components_map["marker"]=rgb;
+						m.push(components_map);
+						month=[];
+						components_count=[];
+						components_map={};
+						opacity=opacity-0.1;
+						//console.log(opacity);
+					/*	if(opacity<="0.1"){
+							//console.log("Inside if: "+opacity);
+							var color1=color.replace(/[^\d,]/g, '').split(',');						
+							color1[2]=(Number(color1[2])-1).toString();
+							color="rgb("+color1[0]+","+color1[1]+","+color1[2]+")";
+							opacity="1.0";
+						}*/
+						}						
+						var layout = {
+						title: 'Aging(In Days)',
+						barmode: 'stack',
+						 
+						width: 600,
+						height: 330,
+						paper_bgcolor:'rgba(0,0,0,0)',
+					    plot_bgcolor:'rgba(0,0,0,0)'};
+						console.log(m);
+						Plotly.newPlot('mypie2', m, layout,{displayModeBar: false});						
+						}
+					});	
+
+}		
+		
+
+
+
+
+	
+
+</script>
+
+</body>
+
+</html>	
