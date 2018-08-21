@@ -3,7 +3,7 @@
    <meta charset="utf-8"/>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
 	
-<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.16/css/jquery.dataTables.min.css"/>
+	
 
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
 <link href='https://fonts.googleapis.com/css?family=Montserrat:400,700'
@@ -91,7 +91,7 @@
  
  var fixmeTop = $('#filters').offset().top;       // get initial position of the element
 
-$(window).scroll(function() {                  // assign scroll event listener
+/*$(window).scroll(function() {                  // assign scroll event listener
 
     var currentScroll = $(window).scrollTop(); // get current position
 
@@ -107,7 +107,7 @@ $(window).scroll(function() {                  // assign scroll event listener
         });
     }
 
-});
+});*/
 $("#from").on('change', function() {securityData()});
 $("#to").on('change', function() {securityData()});
 $('#p0,#p1,#p2,#p3,#p4').change(function() {securityData()});

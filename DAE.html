@@ -1,0 +1,865 @@
+	<!doctype html>
+
+	<html lang="en">
+	<head>
+	<meta charset="utf-8"/>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+	<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.16/css/jquery.dataTables.min.css"/>
+
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+	<link rel="stylesheet" href="http://netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.min.css">
+	<link href='https://fonts.googleapis.com/css?family=Montserrat:400,700'
+	rel='stylesheet' type='text/css'>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+	 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+	<script type="text/javascript" src="https://cdn.datatables.net/1.10.16/js/jquery.dataTables.min.js"></script>
+	<style>
+
+	p
+	{
+		margin-left:10%;
+		text-align:center;
+		font-size:11px;
+	}	
+	.dataBlock {
+    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+    transition: 0.3s;
+    width: 70%;
+    height:65px;
+    line-height:65px;
+    text-align: center;
+	vertical-align: middle;
+	border-radius:5px;
+	border:2px solid #bfb49f;
+	background:#ff7f0e;
+  
+	margin-left:15%;
+	margin-bottom:26px; 
+	font-size:2vw;
+
+}
+
+.dataBlock:hover {
+    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2);
+}
+
+
+
+	</style>
+	<title>DAE</title>
+
+	</head>
+
+	<body>
+		<div>
+			<div style="font-size:1.5vw;font-weight:bold;color:#434444;padding-left: 10px;">Insights Tickets Dashboard</div>
+
+			<div style="font-size:11px;font-weight:bold;color:#434444;padding-left: 10px;"id="today">As on </div>
+
+<button  style="position:absolute;top:5px;right:5px" type="button" onclick="downloadCSV();"> <i class="fa fa-download"></i> OpenTickets</button>
+   
+
+
+
+
+
+		</div>
+	<div style="width:10%;float:left;padding-top:100px">
+	
+		<p>Open Tickets</p>
+		<div id="open_tickets" class="dataBlock"></div>
+		<p>Current week new </p>
+		<div id="currentweek_open" class="dataBlock"></div>
+		<p>Current week closed</p>
+		<div id="currentweek_closed" class="dataBlock"></div>
+		<p>Last week new</p>
+		<div id="lastweek_open" class="dataBlock"></div>
+		<p>Last week closed</p>
+		<div id="lastweek_closed" class="dataBlock"></div>
+		<p>Tickets in 2018</p>
+		<div id="total_tickets" class="dataBlock"></div>
+
+	</div>	
+	<div style="width:90%;float:left">
+		 <div id="multiline_monthly" style="float:left;width:50%"></div>
+	   <div id="multiline_daily" style="float:left;width:50%"></div>
+	   <div id="priority" style="float:left;width:30%"></div>
+	   <div id="aging" style="float:left;width:30%"></div>
+	   <div id="client" style="float:left;width:40%"></div>
+	</div>
+	  
+
+	<script >
+		var today=new Date();
+		var openTicketsData;
+		document.getElementById("today").innerHTML+=today.getDate()+getSuperScript(today.getDate).sup()+monthName(today.getMonth())+","+today.getFullYear();
+		window.addEventListener("resize", redraw);
+
+		function redraw(){
+			Plotly.Plots.resize('multiline_monthly');
+			Plotly.Plots.resize('multiline_daily');
+			Plotly.Plots.resize('priority');
+			Plotly.Plots.resize('aging');
+			Plotly.Plots.resize('client');
+
+		}
+
+		function getSuperScript(day){
+			var day=day%10;
+			switch(day){
+				case 1: return "st";
+				case 2: return "nd";
+				case 3: return "rd";
+				default: return "th";
+			}
+		}
+
+	var open_tickets=
+	{
+		"size" :1000,
+		"sort" : [ {
+				"_uid" : {
+					"order" : "asc"
+				}
+			} ],
+			"query" : {
+				"bool" : {
+					"must_not" : [
+
+						{"match": {
+								"STATUS" : {"query": "Duplicate Resolved Closed Invalid",
+									"operator":"or"
+								}	
+
+							}},
+						
+
+						],
+						"filter" : [ {
+						"range" : {
+							"CREATED_DATE" : {
+								"gte" : "now/y",
+								"lte" : "now",
+								"format" : "yyyy-MM-dd"
+							}
+						}
+					} ]
+					
+					
+
+				}
+			},
+
+	};
+
+	var dae_monthly=
+			{
+			"size" :0,
+			"query" : {
+				"bool" : {
+					
+					
+					
+
+				}
+			},
+			"aggs": {
+			
+					"created": {
+				"terms": {
+					"field": "INCIDENT_MONTH.keyword",
+					"size": 100,
+					"order": {
+						"_term": "asc"
+					}
+				},
+	            "aggs":{
+						"unique_count" : {
+							"cardinality" : {
+								"field" : "ISSUE_ID.keyword"
+							}
+						}
+					}
+				},
+				"resolved": {
+				"terms": {
+					"field": "RESOLVED_MONTH.keyword",
+					"size": 100,
+					"order": {
+						"_term": "asc"
+					}
+				},
+	            "aggs":{
+						"unique_count" : {
+							"cardinality" : {
+								"field" : "ISSUE_ID.keyword"
+							}
+						}
+					}
+				}
+
+
+
+
+	}
+		};
+
+
+		var dae_daily1=
+			{
+			"size" :1000,
+			"sort" : [ {
+				"CREATED_DATE" : {
+					"order" : "desc"
+				}
+			} ],
+
+			"query" : {
+				"bool" : {
+					
+					"filter" : [ {
+						"range" : {
+							"CREATED_DATE" : {
+								"gte" : "now-1M",
+								"lte" : "now",
+								"format" : "yyyy-MM-dd"
+							}
+						}
+					} ]
+					
+
+				}
+			},
+			"aggs": {
+			"created": {
+				"date_histogram" : {
+	                "field" : "CREATED_DATE",
+	                "interval" : "1d"
+	            },
+	            "aggs":{
+						"unique_count" : {
+							"cardinality" : {
+								"field" : "ISSUE_ID.keyword"
+							}
+						}
+					}
+				},
+				"created_weekly": {
+				"date_histogram" : {
+	                "field" : "CREATED_DATE",
+	                "interval" : "1w"
+	            },
+	            "aggs":{
+						"unique_count" : {
+							"cardinality" : {
+								"field" : "ISSUE_ID.keyword"
+							}
+						}
+					}
+				}
+
+
+
+
+
+	}
+		};
+		
+			
+
+		var dae_daily2=
+			{
+			"size" :1000,
+			"sort" : [ {
+				"RESOLVED_DATE" : {
+					"order" : "desc"
+				}
+			} ],
+
+			"query" : {
+				"bool" : {
+					
+					"filter" : [ {
+						"range" : {
+							"RESOLVED_DATE" : {
+								"gte" : "now-1M",
+								"lte" : "now",
+								"format" : "yyyy-MM-dd"
+							}
+						}
+					} ]
+				}
+			},
+			"aggs": {
+			
+					"resolved": {
+				"date_histogram" : {
+	                "field" : "RESOLVED_DATE",
+	                "interval" : "1d"
+	            },
+	            "aggs":{
+						"unique_count" : {
+							"cardinality" : {
+								"field" : "ISSUE_ID.keyword"
+							}
+						}
+					}
+				},
+					"resolved_weekly": {
+				"date_histogram" : {
+	                "field" : "RESOLVED_DATE",
+	                "interval" : "1w"
+	            },
+	            "aggs":{
+						"unique_count" : {
+							"cardinality" : {
+								"field" : "ISSUE_ID.keyword"
+							}
+						}
+					}
+				}
+
+
+
+	}
+		};
+
+		$.ajax({   url: 'http://elasticsearch05.db.shared.int.sv2.247-inc.net:9200/dataanalytics/_search?pretty=true'
+	                     , method: 'POST'
+	                     , data : JSON.stringify(open_tickets)
+	                     , dataType : 'json'
+						 , contentType: "application/x-www-form-urlencoded; charset=utf-8"
+	                     
+	                     , success: function(json, statusText, xhr) {
+						 
+								result = json;
+								//console.log(result);
+								
+
+								generateAgePriClientGraph(result);
+
+								
+								
+								
+							
+							   }
+	                     , error: function(xhr, message, error) {
+	                           console.error("Error while loading data from ElasticSearch", message);
+	                            alert("No Data Available.Check for Network connectivity");
+							   showError(error);
+	                      }
+	            });
+
+
+		$.ajax({   url: 'http://elasticsearch05.db.shared.int.sv2.247-inc.net:9200/dataanalytics/_search?pretty=true'
+	                     , method: 'POST'
+	                     , data : JSON.stringify(dae_monthly)
+	                     , dataType : 'json'
+						 , contentType: "application/x-www-form-urlencoded; charset=utf-8"
+	                     
+	                     , success: function(json, statusText, xhr) {
+						 
+								result = json;
+								//console.log(result);
+								var dataCreated=new Array();
+								var dataResolved=new Array();
+								for(var i=0;i<result.aggregations.created.buckets.length;i++)
+								{
+									var day=result.aggregations.created.buckets[i].key.split("-");
+									var count=result.aggregations.created.buckets[i].unique_count.value;
+									dataCreated.push(new dataentry(day[2],count));
+
+								}
+								for(var i=0;i<result.aggregations.resolved.buckets.length;i++)
+								{
+									var day=result.aggregations.resolved.buckets[i].key.split("-");
+									var count=result.aggregations.resolved.buckets[i].unique_count.value;
+									dataResolved.push(new dataentry(day[2],count));
+
+								}
+
+								generateMonthlyGraph(dataCreated,dataResolved);
+
+								
+								
+								
+							
+							   }
+	                     , error: function(xhr, message, error) {
+	                           console.error("Error while loading data from ElasticSearch", message);
+	                            alert("No Data Available.Check for Network connectivity");
+							   showError(error);
+	                      }
+	            });
+
+
+
+			
+			$.ajax({   url: 'http://elasticsearch05.db.shared.int.sv2.247-inc.net:9200/dataanalytics/_search?pretty=true'
+	                     , method: 'POST'
+	                     , data : JSON.stringify(dae_daily1)
+	                     , dataType : 'json'
+						 , contentType: "application/x-www-form-urlencoded; charset=utf-8"
+	                     
+	                     , success: function(json, statusText, xhr) {
+						 
+								result = json;
+								console.log(result);
+								var dataCreated=new Array();
+								var weekCreated=new Array();
+								var currentWeekIndex=result.aggregations.created_weekly.buckets.length-1;
+								var lastWeekIndex=result.aggregations.created_weekly.buckets.length-2;
+								var currentMonth=new Date().getMonth()+1;
+									//console.log(currentMonth);
+								for(var i=0;i<result.aggregations.created.buckets.length;i++)
+								{
+									var month=result.aggregations.created.buckets[i].key_as_string.split("T")[0].split("-")[1];
+									if(month==currentMonth){
+									var day=result.aggregations.created.buckets[i].key_as_string.split("T")[0];
+									var count=result.aggregations.created.buckets[i].unique_count.value;
+									dataCreated.push(new dataentry(day,count));}
+
+								}
+
+								weekCreated.push(new dataentry("CurrentWeek",result.aggregations.created_weekly.buckets[currentWeekIndex].unique_count.value));
+								weekCreated.push(new dataentry("LastWeek",result.aggregations.created_weekly.buckets[lastWeekIndex].unique_count.value));
+								getResolved(dataCreated,weekCreated);
+								
+								
+							
+							   }
+	                     , error: function(xhr, message, error) {
+	                           console.error("Error while loading data from ElasticSearch", message);
+	                            alert("No Data Available.Check for Network connectivity");
+							   showError(error);
+	                      }
+	            });
+				
+	function getResolved(dataCreated,weekCreated)
+	{
+
+
+
+
+		$.ajax({   url: 'http://elasticsearch05.db.shared.int.sv2.247-inc.net:9200/dataanalytics/_search?pretty=true'
+	                     , method: 'POST'
+	                     , data : JSON.stringify(dae_daily2)
+	                     , dataType : 'json'
+						 , contentType: "application/x-www-form-urlencoded; charset=utf-8"
+	                     
+	                     , success: function(json, statusText, xhr) {
+						 
+								result = json;
+								console.log(result);
+								var dataResolved=new Array();
+								var weekResolved=new Array();
+								var currentWeekIndex=result.aggregations.resolved_weekly.buckets.length-1;
+								var lastWeekIndex=result.aggregations.resolved_weekly.buckets.length-2;
+								var currentMonth=new Date().getMonth()+1;
+
+								for(var i=0;i<result.aggregations.resolved.buckets.length;i++)
+								{
+									var month=result.aggregations.resolved.buckets[i].key_as_string.split("T")[0].split("-")[1];
+									if(month==currentMonth){
+									var day=result.aggregations.resolved.buckets[i].key_as_string.split("T")[0];
+									var count=result.aggregations.resolved.buckets[i].unique_count.value;
+									dataResolved.push(new dataentry(day,count));}
+
+								}
+								weekResolved.push(new dataentry("CurrentWeek",result.aggregations.resolved_weekly.buckets[currentWeekIndex].unique_count.value));
+								weekResolved.push(new dataentry("LastWeek",result.aggregations.resolved_weekly.buckets[lastWeekIndex].unique_count.value));
+
+								generateDailyGraph(dataCreated,dataResolved,weekCreated,weekResolved);
+								
+								
+							
+							   }
+	                     , error: function(xhr, message, error) {
+	                           console.error("Error while loading data from ElasticSearch", message);
+	                            alert("No Data Available.Check for Network connectivity");
+							   showError(error);
+	                      }
+	            });
+
+
+
+	}
+
+	function dataentry(day,count)
+	{
+	   this.day=day;
+	   
+	   this.count=count;
+	   
+	}
+
+
+				function generateDailyGraph(dataCreated,dataResolved,weekCreated,weekResolved)
+				{
+
+					//console.log(dataCreated);
+					//console.log(dataResolved);
+
+					var x_created=new Array();
+					var y_created=new Array();
+					var x_resolved=new Array();
+					var y_resolved=new Array();
+
+	for(var i=0;i<dataCreated.length;i++)
+	{
+		x_created.push(formatDate(dataCreated[i].day));
+		y_created.push(dataCreated[i].count);
+		}
+
+	for(var i=0;i<dataResolved.length;i++)
+	{
+
+	y_resolved.push(dataResolved[i].count);
+	x_resolved.push(formatDate(dataResolved[i].day));
+}
+	document.getElementById("currentweek_open").innerHTML=weekCreated[0].count;
+	document.getElementById("currentweek_closed").innerHTML=weekResolved[0].count;
+	document.getElementById("lastweek_open").innerHTML=weekCreated[1].count;
+	document.getElementById("lastweek_closed").innerHTML=weekResolved[1].count;
+
+	//console.log(x_created);
+	//console.log(y_created);
+
+					var trace1 = {
+	  x:x_created,
+	  y:y_created,
+	  mode: 'lines+markers+text',
+	  name: 'New',
+	  text:y_created,
+	  textposition: 'top',
+	  hoverinfo:'x+y'
+	};
+
+
+
+	var trace2 = {
+	  x:x_resolved,
+	  y: y_resolved,
+	  mode: 'lines+markers+text',
+	  name: 'Closed',
+	  text:y_resolved,
+	  textposition: 'top',
+	  hoverinfo:'x+y'
+	  
+	};
+
+	var data = [ trace1, trace2 ];
+
+	var layout = {
+	  title:'Daily Trend',
+
+	  
+	  xaxis: {
+	  		  	type:'category',
+		tickangle: -45,
+		
+	  
+	    
+	  }
+	};
+
+	//Plotly.newPlot('multiline_monthly', data, layout,{displayModeBar: false},{validate:false});
+	Plotly.newPlot('multiline_daily', data, layout,{displayModeBar: false},{validate:false});
+				}
+
+
+				function generateMonthlyGraph(dataCreated,dataResolved)
+				{
+
+					var x_created=new Array();
+					var y_created=new Array();
+					var x_resolved=new Array();
+					var y_resolved=new Array();
+
+	for(var i=0;i<dataCreated.length;i++)
+	{
+		x_created.push(dataCreated[i].day);
+		y_created.push(dataCreated[i].count);
+		x_resolved.push(dataResolved[i].day);
+		y_resolved.push(dataResolved[i].count);
+
+
+	}
+document.getElementById("total_tickets").innerHTML=y_created.reduce((a,b)=>a+b,0);
+	//console.log(x_count);
+	//console.log(y_created.reduce((a,b)=>a+b,0));
+
+					var trace1 = {
+	  x:x_created,
+	  y:y_created,
+	  mode: 'lines+markers+text',
+	  name: 'New',
+	  text:y_created,
+	  textposition: 'top',
+	  hoverinfo:'x+y'
+	};
+
+
+
+	var trace2 = {
+	  x:x_resolved,
+	  y: y_resolved,
+	  mode: 'lines+markers+text',
+	  name: 'Closed',
+	  text:y_resolved,
+	  textposition: 'bottom',
+	  hoverinfo:'x+y'
+	  
+	};
+
+	var data = [ trace1, trace2 ];
+
+	var layout = {
+	  title:new Date().getFullYear()+' Monthly Trend',
+	  
+	  xaxis: {
+	  
+	tickangle: -45,
+	 
+	    
+	  }
+	};
+
+	Plotly.newPlot('multiline_monthly', data, layout,{displayModeBar: false},{validate:false});
+
+				}
+
+
+		function generateAgePriClientGraph(result){
+
+	var data_map={}
+openTicketsData="Issue Key,Status,Assignee,Client,Priority,Created(mm/dd/yyyy),ReportedBy"+"\n";
+
+	for(var i=0;i<result.hits.hits.length;i++)
+	{
+		if(data_map[result.hits.hits[i]._source.ISSUE_ID]==null){
+			var ISSUE_ID=result.hits.hits[i]._source.ISSUE_ID;
+			var id=result.hits.hits[i]._id;
+			var Summary=result.hits.hits[i]._source.SUBJECT;
+			var Status=result.hits.hits[i]._source.STATUS;
+			var Assignee=result.hits.hits[i]._source.ASSIGNEE;
+			var client=result.hits.hits[i]._source.CLIENT;
+			var priority=result.hits.hits[i]._source.PRIORITY;
+			var Created=result.hits.hits[i]._source.CREATED_DATE;
+			var ReportedBy=result.hits.hits[i]._source.REPORTED_BY;
+			var age=result.hits.hits[i]._source.AGING;
+			data_map[result.hits.hits[i]._source.ISSUE_ID]=new dataentryAgePriCli(ISSUE_ID,id,priority,client,age);
+			openTicketsData+=ISSUE_ID+","+Status+","+Assignee+","+client+","+priority+","+Created+","+ReportedBy+"\n";
+		}
+		else{
+			//var ISSUE_ID=data_map[result.hits.hits[i]._source.ISSUE_ID].ISSUE_ID;
+			var id=data_map[result.hits.hits[i]._source.ISSUE_ID].id+":CLOUD"+result.hits.hits[i]._id.split("CLOUD")[2];
+			var client;
+			if(data_map[result.hits.hits[i]._source.ISSUE_ID].client.includes(result.hits.hits[i]._source.CLIENT))
+			{
+				//ignore case
+			}
+			else 
+			{client=data_map[result.hits.hits[i]._source.ISSUE_ID].client+","+result.hits.hits[i]._source.CLIENT;}
+			data_map[result.hits.hits[i]._source.ISSUE_ID].id = id;
+			data_map[result.hits.hits[i]._source.ISSUE_ID].client = client;
+			}
+	}
+	//console.log(openTicketsData);
+	var pri_map={};
+	var age_map={};
+	var client_map_array=new Array();
+	var client_map={};
+	var priority_group=new Array();
+	var priority_count=new Array();
+	var age_group=new Array();
+	var age_count=new Array();
+	var client_group=new Array();
+	var client_count=new Array();
+
+	pri_map["Blocker (P0)"]=0;
+	pri_map["Critical (P1)"]=0;
+	pri_map["High (P2)"]=0;
+	pri_map["Medium (P3)"]=0;
+	pri_map["Low (P4)"]=0;
+	pri_map["Very Low (P5)"]=0;
+
+	age_map["<7"]=0;
+	age_map["<15"]=0;
+	age_map["<30"]=0;
+	age_map["<60"]=0;
+	age_map[">60"]=0;
+	age_map[">90"]=0;
+
+var open_tickets=0;
+
+	Object.keys(data_map).forEach(function(key) {
+
+		if(pri_map[data_map[key].priority]==null){pri_map[data_map[key].priority]=1;}
+		else {pri_map[data_map[key].priority]+=1;}
+
+	if(age_map[data_map[key].age]==null){age_map[data_map[key].age]=1;}
+		else {age_map[data_map[key].age]+=1;}
+
+	if(data_map[key].client.split(",").length>1)
+	{
+	for(var k=0;k<data_map[key].client.split(",").length;k++){client_map_array.push(data_map[key].client.split(",")[k]);}
+	}
+	else 	{client_map_array.push(data_map[key].client);}
+
+			open_tickets+=1;							
+									});
+	//console.log(open_tickets);
+	document.getElementById('open_tickets').innerHTML=open_tickets;
+
+
+	client_map_array.sort();
+	for(var y=0;y<client_map_array.length;y++)
+	{
+		if(client_map[client_map_array[y]]==null){client_map[client_map_array[y]]=1;}
+		else {client_map[client_map_array[y]]+=1;}
+	}
+
+
+
+
+
+	Object.keys(pri_map).forEach(function(key) {
+		priority_group.push(key);
+		priority_count.push(pri_map[key]);
+	});
+
+	Object.keys(age_map).forEach(function(key) {
+		age_group.push(key);
+		age_count.push(age_map[key]);
+	});
+
+	Object.keys(client_map).forEach(function(key) {
+		client_group.push(key);
+		client_count.push(client_map[key]);
+	});
+	/*console.log(priority_group +"--"+priority_count);
+	console.log(age_group+"--"+age_count);*/
+	console.log(client_group+"--"+client_count);
+
+
+	var pri_data = [
+	  {
+	    x: priority_group,
+	    y: priority_count,
+	    type: 'bar',
+	    text:priority_count,
+	  	textposition: 'auto',
+	 	hoverinfo:'x+y',
+	 	marker: {
+	    color: '#ff7f0e'}
+	  }
+	];
+
+	var pri_layout= {
+	  title:'Priority',
+	  xaxis: {
+	  	tickangle: -45
+			  }
+	};
+
+	var age_data = [
+	  {
+	    x: age_group,
+	    y: age_count,
+	    type: 'bar',
+	    text:age_count,
+	  	textposition: 'auto',
+	 	hoverinfo:'x+y',
+	 	marker: {
+	    color: '#ff7f0e'}
+	  }
+	];
+
+	var age_layout= {
+	  title:'Aging',
+	  xaxis: {
+	  	tickangle: 0
+			  }
+	};
+
+	var cli_data = [
+	  {
+	    x: client_group,
+	    y: client_count,
+	    type: 'bar',
+	    text:client_count,
+	  	textposition: 'auto',
+	 	hoverinfo:'x+y',
+	 	marker: {
+	    color: '#ff7f0e'}
+	  }
+	];
+
+	var cli_layout= {
+	  title:'Clients',
+	   xaxis: {
+	   	type:'category',
+	  	tickangle: -45
+			  }
+	};
+
+	Plotly.newPlot('priority', pri_data,pri_layout,{displayModeBar: false});
+
+
+	Plotly.newPlot('aging', age_data,age_layout,{displayModeBar: false});
+
+	Plotly.newPlot('client', cli_data,cli_layout,{displayModeBar: false});
+
+
+	}
+
+	function dataentryAgePriCli(ISSUE_ID,id,priority,client,age)
+	{
+		this.ISSUE_ID=ISSUE_ID;
+		this.id=id;
+		this.priority=priority;
+		this.client=client;
+		this.age=age;
+	}
+	
+	function formatDate(day)
+	{
+var formattedDay=day.split("-");
+
+
+return formattedDay[2]+"-"+monthName(formattedDay[1]-1);
+	}	
+
+	function monthName(month_id)
+	{
+var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+return months[month_id];
+	}		
+
+	 function downloadCSV() {
+        var data, filename, link;
+        var csv=openTicketsData;
+        var date=new Date();
+        if (csv == null) return;
+
+        filename = 'OpenTickets_'+date.getDate()+'-'+(date.getMonth()+1)+'-'+date.getFullYear()+'.csv';
+
+        if (!csv.match(/^data:text\/csv/i)) {
+            csv = 'data:text/csv;charset=utf-8,' + csv;
+        }
+        data = encodeURI(csv);
+
+        link = document.createElement('a');
+        link.setAttribute('href', data);
+        link.setAttribute('download', filename);
+        link.click();
+    }
+	
+
+	</script>
+	</body>
+	</html>

@@ -1,0 +1,476 @@
+	<!doctype html>
+
+		<html lang="en">
+		<head>
+		<meta charset="utf-8"/>
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+		<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.16/css/jquery.dataTables.min.css"/>
+
+		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+		<link rel="stylesheet" href="http://netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.min.css">
+		<link href='https://fonts.googleapis.com/css?family=Montserrat:400,700'
+		rel='stylesheet' type='text/css'>
+		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+		 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+		<script type="text/javascript" src="https://cdn.datatables.net/1.10.16/js/jquery.dataTables.min.js"></script>
+
+		<script src="elasticsearch-js-14.2.1\elasticsearch-js\elasticsearch.min.js"></script>
+		<script src="https://d3js.org/d3.v4.min.js"></script>
+		<script src="d3pie.js"></script>	
+		<style>
+
+		
+
+
+		</style>
+		<title>CICD</title>
+
+		</head>
+
+		<body style="overflow-y:auto;overflow-x:hidden">
+			<div>
+			<div style="font-size:1.5vw;font-weight:bold;color:#434444;padding-left: 10px;">CICD Dashboard</div>
+
+			<div style="font-size:11px;font-weight:bold;color:#434444;padding-left: 10px;"id="today">As on </div>
+
+<!-- <button  style="position:absolute;top:5px;right:5px" type="button" onclick="downloadCSV();"> <i class="fa fa-download"></i> OpenTickets</button> -->
+   
+
+
+
+
+
+		</div>
+		<div style="width:0%;float:left;padding-top:100px">
+
+
+		</div>	
+		<div style="width:100%;float:left">
+			 <div id="resolution" style="float:left;width:50%"></div>
+			 	<div id="monthly" style="float:left;width:50%"></div>
+			<div id="status" style="float:left;width:45%"></div>
+			<div id="priority" style="float:left;width:45%"></div>
+		
+		</div>
+
+	<script type="text/javascript">
+			var today=new Date();
+			document.getElementById("today").innerHTML+=today.getDate()+getSuperScript(today.getDate).sup()+monthName(today.getMonth())+","+today.getFullYear();
+			var cicd_monthly=
+				{
+				"size" :0,
+				"query" : {
+					"bool" : {
+						"must_not" : [
+
+						{"match": {
+								"PRIORITY" : "None"	
+
+							}},
+						
+
+						]
+				
+					}
+				},
+				"aggs": {
+				
+						"created": {
+					"terms": {
+						"field": "INCIDENT_MONTH.keyword",
+						"size": 100,
+						"order": {
+							"_term": "asc"
+						}
+					}
+					},
+					"resolved": {
+					"terms": {
+						"field": "RESOLVED_MONTH.keyword",
+						"size": 100,
+						"order": {
+							"_term": "asc"
+						}
+					}
+					}
+		}
+			};
+
+
+					$.ajax({   url: 'http://elasticsearch05.db.shared.int.sv2.247-inc.net:9200/jiracicd/_search?pretty=true'
+									, method: 'POST'
+									, data : JSON.stringify(cicd_monthly)
+									, dataType : 'json'
+							 , contentType: "application/x-www-form-urlencoded; charset=utf-8"
+									
+									, success: function(json, statusText, xhr)
+									 {
+									result = json;
+									var created_months=new Array();
+									var resolved_months=new Array();
+									var created_count=new Array();
+									var resolved_count=new Array();
+									for(var i=0;i<result.aggregations.created.buckets.length;i++)
+									{	month=result.aggregations.created.buckets[i].key.split("-");
+										created_months.push(month[0]+"-"+month[2]);
+										created_count.push(result.aggregations.created.buckets[i].doc_count);
+									}
+									for(var i=0;i<result.aggregations.resolved.buckets.length;i++)
+									{	month=result.aggregations.resolved.buckets[i].key.split("-");
+										resolved_months.push(month[0]+"-"+month[2]);
+										resolved_count.push(result.aggregations.resolved.buckets[i].doc_count);
+									}
+									generateMonthlyCICD(created_months,created_count,resolved_months,resolved_count);
+									
+									
+							  }
+									, error: function(xhr, message, error) {
+											console.error("Error while loading data from ElasticSearch", message);
+											 alert("No Data Available.Check for Network connectivity");
+									showError(error);
+									 }
+						});
+
+
+var cicd_resolution=
+				{
+				"size" :0,
+				"query" : {
+					"bool" : {
+						"must_not" : [
+
+						{"match": {
+								"PRIORITY" : "None"	
+
+							}},
+						
+
+						]
+				
+					}
+				},
+				"aggs": {
+				
+						"priority": {
+					"terms": {
+						"field": "PRIORITY.keyword",
+						"size": 100,
+						"order": {
+							"_term": "desc"
+						}
+					},
+					  "aggs":{
+					"resolution" : {
+						"terms" : {
+							"field" : "RESOLUTION_GROUP.keyword",
+							"min_doc_count": 0,
+							"order" : {
+						"_term" : "asc"
+					}
+					}
+					
+					
+					
+					
+					}
+					}
+					
+		}}
+			};
+
+
+					$.ajax({   url: 'http://elasticsearch05.db.shared.int.sv2.247-inc.net:9200/jiracicd/_search?pretty=true'
+									, method: 'POST'
+									, data : JSON.stringify(cicd_resolution)
+									, dataType : 'json'
+							 , contentType: "application/x-www-form-urlencoded; charset=utf-8"
+									
+									, success: function(json, statusText, xhr)
+									 {
+									result = json;
+									//console.log(result)
+									generateResolution(result)
+
+									
+									
+							  }
+									, error: function(xhr, message, error) {
+											console.error("Error while loading data from ElasticSearch", message);
+											 alert("No Data Available.Check for Network connectivity");
+									showError(error);
+									 }
+						});					
+
+
+						
+
+
+var cicd_status=
+				{
+				"size" :0,
+				"query" : {
+					"bool" : {
+						"must_not" : [
+
+						{"match": {
+								"PRIORITY" : "None"	
+
+							}},
+						
+
+						]
+				
+					}
+				},
+				"aggs": {
+				
+						"priority": {
+					"terms": {
+						"field": "PRIORITY.keyword",
+						"size": 100,
+						"order": {
+							"_term": "desc"
+						}
+					},
+					"aggs":{
+						"status" : {
+						"terms" : {
+							"field" : "STATUS.keyword",
+							"min_doc_count": 0,
+							"order" : {
+						"_term" : "asc"
+					}
+					}
+
+					
+					}
+
+					}
+					  
+					
+		}
+
+					
+					
+
+	}
+			};
+
+
+					$.ajax({   url: 'http://elasticsearch05.db.shared.int.sv2.247-inc.net:9200/jiracicd/_search?pretty=true'
+									, method: 'POST'
+									, data : JSON.stringify(cicd_status)
+									, dataType : 'json'
+							 , contentType: "application/x-www-form-urlencoded; charset=utf-8"
+									
+									, success: function(json, statusText, xhr)
+									 {
+									result = json;
+									//console.log(result)
+									generateStatus(result)
+
+									
+									
+							  }
+									, error: function(xhr, message, error) {
+											console.error("Error while loading data from ElasticSearch", message);
+											 alert("No Data Available.Check for Network connectivity");
+									showError(error);
+									 }
+						});
+
+
+	function generateMonthlyCICD(created_months,created_count,resolved_months,resolved_count)
+						{
+						
+								var trace1 = {
+						  		x:created_months,
+					  				y:created_count,
+			  						mode: 'lines+markers+text',
+			  						name: 'Created',
+			  						text:created_count,
+			  						textposition: 'top',
+			  						hoverinfo:'x+y'
+			
+			};
+
+
+
+			var trace2 = {
+			  x:resolved_months,
+			  y: resolved_count,
+			  mode: 'lines+markers+text',
+			  name: 'Resolved',
+			  text:resolved_count,
+			  textposition: 'bottom',
+			  hoverinfo:'x+y'
+			  
+			};
+
+		var data = [ trace1, trace2 ];
+
+		var layout = {
+		  title:'Monthly Trend',
+		  height:500,
+		  xaxis: {
+		  
+		tickangle: -45,
+		 
+			 
+		  }
+		};
+
+		Plotly.newPlot('monthly', data, layout,{displayModeBar: false},{validate:false});
+
+						}
+
+
+	function generateResolution(result)
+	{
+
+var data=new Array();
+
+var colour_map={}
+colour_map["Blocker (P0)"]="#b71c1c"
+colour_map["Critical (P1)"]="#e65100"
+colour_map["High (P2)"]="#ffd54f"
+colour_map["Medium (P3)"]="#1f6798"
+colour_map["Low (P4)"]="#009688"
+colour_map["Very Low (P5)"]="#4caf50"
+
+for(var i=0;i<result.aggregations.priority.buckets.length;i++){
+	var x_labels=new Array();
+	var y_count=new Array();
+	for(var j=0;j<result.aggregations.priority.buckets[i].resolution.buckets.length;j++){
+
+		//if(result.aggregations.priority.buckets[i].resolution.buckets[j].doc_count!=0){
+x_labels.push(result.aggregations.priority.buckets[i].resolution.buckets[j].key.split("#")[1]);
+y_count.push(result.aggregations.priority.buckets[i].resolution.buckets[j].doc_count);}
+	//}
+
+//console.log(result.aggregations.priority.buckets[i].key);
+	var trace=
+	{
+		x:x_labels,
+		y:y_count,
+		name:result.aggregations.priority.buckets[i].key.split("-")[1],
+		type:'bar',
+		hoverinfo:'y',
+		marker:{
+			color:colour_map[result.aggregations.priority.buckets[i].key.split("-")[1]]
+		}
+	}
+	data.push(trace);
+}
+
+	
+	var layout = {
+		  title:'Resolution Time ',
+
+		  barmode:'stack',
+		  height:500,
+		  xaxis: {
+				tickangle: -45,
+		   }
+		};
+
+		Plotly.newPlot('resolution', data, layout,{displayModeBar: false},{validate:false});
+
+}
+
+
+	function generateStatus(result)
+	{
+		
+		var priority_labels= new Array();
+		var priority_count= new Array();
+		var status_labels= new Array();
+		var status_count= new Array();
+		var status_bar=new Array();
+
+var colour_map={}
+colour_map["Blocker (P0)"]="#b71c1c"
+colour_map["Critical (P1)"]="#e65100"
+colour_map["High (P2)"]="#ffd54f"
+colour_map["Medium (P3)"]="#1f6798"
+colour_map["Low (P4)"]="#009688"
+colour_map["Very Low (P5)"]="#4caf50"
+
+		for(var i=0;i<result.aggregations.priority.buckets.length;i++)
+		{
+if(result.aggregations.priority.buckets[i].doc_count!=0)
+	{priority_labels.push(result.aggregations.priority.buckets[i].key.split("-")[1]);
+		priority_count.push(result.aggregations.priority.buckets[i].doc_count);
+	}
+		}
+
+
+
+for(var i=0;i<result.aggregations.priority.buckets.length;i++){
+	var x_labels=new Array();
+	var y_count=new Array();
+	for(var j=0;j<result.aggregations.priority.buckets[i].status.buckets.length;j++){
+
+x_labels.push(result.aggregations.priority.buckets[i].status.buckets[j].key);
+y_count.push(result.aggregations.priority.buckets[i].status.buckets[j].doc_count);}
+	var trace=
+	{
+		x:x_labels,
+		y:y_count,
+		name:result.aggregations.priority.buckets[i].key.split("-")[1],
+		type:'bar',
+		hoverinfo:'y',
+		marker:{
+			color:colour_map[result.aggregations.priority.buckets[i].key.split("-")[1]]
+		}
+	}
+	status_bar.push(trace);
+}
+		var trace_pie=[{
+			values:priority_count,
+			labels:priority_labels,
+			type:'pie',
+
+		}]
+
+		var layout_pie = {
+		  title:'By Priority',
+
+		   xaxis: {
+				tickangle: -45,
+		   }
+		};
+		var layout_bar = {
+		  title:'By Status',
+			barmode:'stack',
+		   xaxis: {
+				tickangle: -45,
+		   }
+		};
+		 var data_bar;
+		 Plotly.newPlot('priority', trace_pie, layout_pie,{displayModeBar: false},{validate:false});
+		 Plotly.newPlot('status', status_bar, layout_bar,{displayModeBar: false},{validate:false});
+			
+	}				
+
+		function getSuperScript(day){
+			var day=day%10;
+			switch(day){
+				case 1: return "st";
+				case 2: return "nd";
+				case 3: return "rd";
+				default: return "th";
+			}
+		}
+			function monthName(month_id)
+	{
+var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+return months[month_id];
+	}		
+	
+
+	</script>
+	</body>

@@ -35,7 +35,7 @@ rel='stylesheet' type='text/css'>
     margin-right:20px;
 }
 
-.range1 { background: #4c8448;}
+.range1 { background: #97dc92;}
 .range2 { background: #82c77e;}
 .range3 { background: #b2c77e;}
 .range4 { background: #f5cf47;}
@@ -66,6 +66,9 @@ rel='stylesheet' type='text/css'>
      <div > <p class="range"><span class="block range8"></span>>100</p> </div>
 	</div>
 
+	<div id="datatable" style="float:left;padding-top:200px;padding-left: 50px;">
+	</div>
+
 <script >
 var gte=new Date(new Date().getFullYear(), 0, 1);
 var lte=new Date();
@@ -76,14 +79,7 @@ var heatmap={
 			"bool" : {
 				"must" : [
 
-				{
-					"match" : {
-						"PRODUCT" : {"query":"Instrumentation Insights DPX TIE Pulse",
-							"operator":"or"
-						}	
-
-					}
-				}
+				
 
 				],
 				
@@ -108,6 +104,7 @@ var heatmap={
 					},
 					"size" : 500
 				},
+				
 					"aggs":{
 					"month" : {
 						"terms" : {
@@ -116,8 +113,16 @@ var heatmap={
 							"order" : {
 						"_term" : "asc"
 					},
-					"size":500						}
+					"size":500						},
+					"aggs":{
+						"unique_count" : {
+							"cardinality" : {
+								"field" : "ISSUE_ID.keyword"
+							}
+						}
 					}
+					}
+					
 					
 					
 					
@@ -130,16 +135,17 @@ var heatmap={
 		
 		
 		}
-		function dataentry(client,month,count)
+		function dataentry(client,month,month_db,count)
 {
    this.client=client;
    this.month=month;
+   this.month_db=month_db;
    this.count=count;
    
 }
 var m;
 		
-		$.ajax({   url: 'http://elasticsearch05.db.shared.int.sv2.247-inc.net:9200/jiracloud/prodincidents/_search?pretty=true'
+		$.ajax({   url: 'http://elasticsearch05.db.shared.int.sv2.247-inc.net:9200/dataanalytics/prodincidents/_search?pretty=true'
                      , method: 'POST'
                      , data : JSON.stringify(heatmap)
                      , dataType : 'json'
@@ -151,17 +157,20 @@ var m;
 							console.log(result);
 							m=new Array();
 							var map={};
+							var month_map={};
 							//var area=d3.select("body").append("svg").attr("height",height).attr("width",width).append("g").attr("transform","translate(200,0)");
 							for(var i=0;i<result.aggregations.client.buckets.length;i++){
-							
+							var client_count=0;
 							for(var j=result.aggregations.client.buckets[i].month.buckets.length-6;j<result.aggregations.client.buckets[i].month.buckets.length;j++){
 
 								var month=result.aggregations.client.buckets[i].month.buckets[j].key.split("-");
 
-							m.push(new dataentry(result.aggregations.client.buckets[i].key,month[0]+"-"+month[2],result.aggregations.client.buckets[i].month.buckets[j].doc_count));
+							m.push(new dataentry(result.aggregations.client.buckets[i].key,month[2],result.aggregations.client.buckets[i].month.buckets[j].key,result.aggregations.client.buckets[i].month.buckets[j].unique_count.value));
+							client_count+=result.aggregations.client.buckets[i].month.buckets[j].unique_count.value;
+
 							
 							}
-							m.push(new dataentry(result.aggregations.client.buckets[i].key,"Total",result.aggregations.client.buckets[i].doc_count));
+							m.push(new dataentry(result.aggregations.client.buckets[i].key,"Total","Total",client_count));
 							
 							
 							}
@@ -169,13 +178,19 @@ var m;
 							
 							for(var k=0;k<m.length;k++){
 							//console.log(m[k].month);
-							if(map[m[k].month]==null){map[m[k].month]=m[k].count;}
-							else map[m[k].month]+=m[k].count;
+							if(map[m[k].month]==null)
+								{map[m[k].month]=m[k].count;
+									month_map[m[k].month]=m[k].month_db;
+								}
+							else 
+								{map[m[k].month]+=m[k].count;
+							}
 							}
 							var value;
+
 								Object.keys(map).forEach(function(key) {
 									value = map[key];
-									m.push(new dataentry("Total",key,value));
+									m.push(new dataentry("Total",key,month_map[key],value));
 									//console.log(value);
 									//console.log(key);
 								});
@@ -193,13 +208,14 @@ var m;
 			//console.log(data);
 			var width;
 			var height;
-			var cellsize_x=60;
+			var cellsize_x=100;
 			var cellsize_y=20;
 			var item_x=[];
 			var item_y=[];
 			var x_scale;
 			var y_scale;
 			var color_scale;
+			var color_scale1;
 			var x_axis;
 			var y_axis;
 
@@ -214,15 +230,19 @@ var m;
 			item_y=d3.set(item_y).values();
 			x_scale = d3.scalePoint()
 						.domain(item_x)
-						.range([0, (item_x.length-1) * cellsize_x]);
+						.range([0, (item_x.length-0.9) * cellsize_x]);
 			y_scale = d3.scalePoint()
 						.domain(item_y)
-						.range([0, (item_y.length-1) * cellsize_y]);
+						.range([0, (item_y.length+0.1) * cellsize_y]);
 					//console.log(item_x);
 
 			color_scale= d3.scaleThreshold()
     .domain([1,2,5,10,30,50, 100,5000])
-    .range(["#4c8448", "#82c77e","#b2c77e","#f5cf47", "#ffa500","#ff8100","#ff4700","#f50404","#fff"]);			
+    .range(["#97dc92", "#82c77e","#b2c77e","#f5cf47", "#ffa500","#ff8100","#ff4700","#f50404","#fff"]);	
+    color_scale_1= d3.scaleThreshold()
+    .domain([1,2,5,10,30,50, 100])
+    .range(["#97dc92", "#82c77e","#b2c77e","#f5cf47", "#ffa500","#ff8100","#ff4700","#f50404"]);
+   	
 			x_axis = d3.axisTop()
 					.scale(x_scale)
 					.tickFormat(function (d,i) {
@@ -248,7 +268,45 @@ var m;
 				.attr("height",function(d,i,data){return cellsize_y;})
 				.attr("x",function(d){return x_scale(d.month);})
 				.attr("y",function(d){return y_scale(d.client);})
-				.attr("fill",function(d){return color_scale(d.count);})
+				.attr("fill",function(d)
+					{if(d.client=='Total'){
+						console.log(d.client);return "#adacac";}
+						return color_scale(d.count);
+						
+						
+
+
+
+					})
+				.on("click",function(d)
+					{ 
+						if(d.month=="Total"||d.client=="Total")
+					{
+						//console.log(d);
+					}
+					else 
+					{
+						
+						onClick(d);
+					}
+
+					})
+				.on("mouseover", function(d) 
+					{
+if(d.month=="Total"||d.client=="Total")
+					{
+						//console.log(d);
+					}
+					else 
+					{
+						
+						d3.select(this).style("cursor", "pointer"); 
+					}
+
+
+				})
+				.on("mouseout", function(d) {d3.select(this).style("cursor", "default"); })
+      
 				//console.log(x_scale("2017-I-September"));
 
 			area.selectAll("text")
@@ -258,7 +316,30 @@ var m;
     .attr("x", function(d) { return x_scale(d.month)+(cellsize_x*2)/5; })
     .attr("y", function(d) { return y_scale(d.client)+(cellsize_y/2);})
     .attr("dy", ".35em")
-    .text(function(d) { return d.count; });
+    .text(function(d) { return d.count; })
+    .on("click",function(d){
+		if(d.month=="Total"||d.client=="Total")
+					{
+						console.log(d);
+					}
+					else 
+					{
+						
+						onClick(d);
+					}
+				})
+    .on("mouseover",function(d) {
+    if(d.month=="Total"||d.client=="Total")
+					{
+						//console.log(d);
+					}
+					else 
+					{
+						
+						d3.select(this).style("cursor", "pointer"); 
+					}
+    })
+				.on("mouseout",function(d) {d3.select(this).style("cursor", "default"); })
 
     area.append("text")
      	 .attr("x",(item_x.length * cellsize_x)/2)
@@ -287,6 +368,91 @@ var m;
         .attr("dy", ".5em")
         .attr('transform',"translate("+cellsize_x/2+",0) rotate(-45)");
 			
+			}
+
+			function onClick(d)
+			{//console.log(d);
+var month=d.month_db.split("-");
+month=month[0]+"* *"+month[2];
+var client_name=d.client.split(" ");
+var client="";
+if(client_name.length>1){
+for(var j=0;j<client_name.length;j++){
+client +="*"+client_name[j]+"* ";
+
+}
+}
+else{client=d.client;}
+
+console.log(client);
+
+	var blockData=
+	{
+		"size" : 1000,
+		"sort" : [ {
+			"CREATED_DATE" : {
+				"order" : "desc"
+			}
+		} ],
+
+		"query" : {
+			"bool" : {
+				"must" : [
+
+				{
+					"match" : {
+						"PRODUCT" : {"query":"Instrumentation Insights DPX TIE Pulse",
+							"operator":"or"
+						}	
+
+					}
+				}, {
+					"match" : {
+						"CLIENT" : {"query":client,
+							"operator":"and"
+						}	
+					}
+				},
+				{
+					"match" : {
+						"INCIDENT_MONTH" : {"query":month,
+							"operator":"and"
+						}	
+					}
+				}
+
+				],
+				
+
+			}
+		}
+
+	};		
+
+	$.ajax({   url: 'http://elasticsearch05.db.shared.int.sv2.247-inc.net:9200/jiracloud/prodincidents/_search?pretty=true'
+                     , method: 'POST'
+                     , data : JSON.stringify(blockData)
+                     , dataType : 'json'
+					 , contentType: "application/x-www-form-urlencoded; charset=utf-8"
+                     
+                     , success: function(json, statusText, xhr) {
+					 var result=json;
+					 if(result.hits.hits.length==d.count && result.hits.hits.length>0)
+					 {
+					 	document.getElementById('datatable').innerHTML=""
+					 	for(var i=0;i<result.hits.hits.length;i++){
+					 	document.getElementById('datatable').innerHTML+=result.hits.hits[i]._id+"<br>";
+					 }
+					 }
+
+						   }
+                     , error: function(xhr, message, error) {
+                           console.error("Error while loading data from ElasticSearch", message);
+                            alert("No Data Available.Check for Network connectivity");
+						   showError(error);
+                      }
+            });
+
 			}
 
 </script>

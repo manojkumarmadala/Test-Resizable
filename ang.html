@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.9/angular.min.js"></script>
+<body>
+
+<p>Try to change the names.</p>
+
+
+<div ng-app="myApp2" >
+ <p>My first expression: {{ 5 + 5 }}</p>
+</div>
+
+<script>
+
+
+var app2 = angular.module('myApp2', []);
+
+app2.controller('myCtrl2', function($scope) {
+    $scope.firstName= "Jo";
+    $scope.lastName= "Do";
+});
+</script>
+
+</body>
+</html>

@@ -249,7 +249,7 @@ var components = {
 
 				{
 					"match" : {
-						"PRODUCT" : {"query":"Instrumentation Insights DPX TIE Pulse",
+						"PRODUCT" : {"query":"",
 							"operator":"or"
 						}	
 
@@ -302,19 +302,346 @@ var components = {
 		
 		}
 
-	$.ajax({   url: 'http://elasticsearch05.db.shared.int.sv2.247-inc.net:9200/jiracloud/prodincidents/_search?pretty=true'
+
+	var availability=	
+	{
+	"query": {
+		"bool" : {
+				"must" : [
+				{
+					"match" : {
+						"PLATFORM" : "Chat Platform"	
+
+					}
+				}
+
+				]}
+
+		
+	},
+	"size": 0,
+	
+	"aggs": {
+		"Month": {
+			"terms": {
+				"field": "INCIDENT_MONTH.keyword",
+				"size": 100,
+				"order": {
+					"_term": "asc"
+				}
+			},
+			
+					"aggs": {
+						"Availability": {
+							"avg": {
+								"field": "AVAILABILITY(%)"
+							}
+						},
+						"Expected": {
+							"avg": {
+								"field": "EXPECTED(%)"
+							}
+						}
+					}
+				}
+			}
+		};
+
+
+		var blockData={
+		"size" : 1000,
+		"sort" : [ {
+			"CREATED_DATE" : {
+				"order" : "desc"
+			}
+		} ],
+
+		"query" : {
+			"bool" : {
+				"must" : [
+
+				{
+					"match" : {
+						"PRODUCT" : {"query":"Instrumentation Insights DPX TIE Pulse",
+							"operator":"or"
+						}	
+
+					}
+				}, {
+					"match" : {
+						"CLIENT" : "*CAAT"
+					}
+				},
+				{
+					"match" : {
+						"INCIDENT_MONTH" :{"query":"2018* *February",
+							"operator":"and"
+						}	
+					}
+				}
+
+				],
+				
+
+			}
+		}
+};	
+
+
+	var dae_monthly1=
+		{
+		"size" :1000,
+		"sort" : [ {
+			"CREATED_DATE" : {
+				"order" : "desc"
+			}
+		} ],
+
+		"query" : {
+			"bool" : {
+				
+				"filter" : [ {
+					"range" : {
+						"CREATED_DATE" : {
+							"gte" : "now-3M/M",
+							"lte" : "now+1M/M",
+							"format" : "yyyy-MM-dd"
+						}
+					}
+				} ]
+				
+
+			}
+		},
+		"aggs": {
+		"Month-C": {
+			"date_histogram" : {
+                "field" : "CREATED_DATE",
+                "interval" : "1d"
+            },
+            "aggs":{
+					"type_count" : {
+						"cardinality" : {
+							"field" : "ISSUE_ID.keyword"
+						}
+					}
+				}
+			}
+
+
+
+}
+	};
+	var dae_monthly2=
+		{
+		"size" :1000,
+		"sort" : [ {
+			"RESOLVED_DATE" : {
+				"order" : "desc"
+			}
+		} ],
+
+		"query" : {
+			"bool" : {
+				
+				"filter" : [ {
+					"range" : {
+						"RESOLVED_DATE" : {
+							"gte" : "now/w",
+							"lte" : "now",
+							"format" : "yyyy-MM-dd"
+						}
+					}
+				} ]
+				
+
+			}
+		},
+		"aggs": {
+		
+				"Month-R": {
+			"date_histogram" : {
+                "field" : "RESOLVED_DATE",
+                "interval" : "1d"
+            },
+            "aggs":{
+					"type_count" : {
+						"cardinality" : {
+							"field" : "ISSUE_ID.keyword"
+						}
+					}
+				}
+			}
+
+
+
+}
+	};
+
+	var dae_monthly=
+		{
+		"size" :0,
+		"query" : {
+			"bool" : {
+				
+				
+				
+
+			}
+		},
+		"aggs": {
+		
+				"created": {
+			"terms": {
+				"field": "INCIDENT_MONTH.keyword",
+				"size": 100,
+				"order": {
+					"_term": "asc"
+				}
+			},
+            "aggs":{
+					"unique_count" : {
+						"cardinality" : {
+							"field" : "ISSUE_ID.keyword"
+						}
+					}
+				}
+			},
+			"resolved": {
+			"terms": {
+				"field": "RESOLVED_MONTH.keyword",
+				"size": 100,
+				"order": {
+					"_term": "asc"
+				}
+			},
+            "aggs":{
+					"type_count" : {
+						"cardinality" : {
+							"field" : "ISSUE_ID.keyword"
+						}
+					}
+				}
+			}
+
+
+
+
+}
+	};
+
+
+var open_tickets=
+{
+	"size" :1000,
+	"sort" : [ {
+			"_uid" : {
+				"order" : "asc"
+			}
+		} ],
+		"query" : {
+			"bool" : {
+				"must_not" : [
+
+					{"match": {
+							"STATUS" : {"query": "Duplicate Resolved Closed Invalid",
+								"operator":"or"
+							}	
+
+						}},
+					
+
+					],
+					"filter" : [ {
+					"range" : {
+						"CREATED_DATE" : {
+							"gte" : "now/y",
+							"lte" : "now",
+							"format" : "yyyy-MM-dd"
+						}
+					}
+				} ]
+				
+				
+
+			}
+		}
+
+};
+
+
+var uid=
+{"sort" : [ {
+			"_uid" : {
+				"order" : "desc"
+			}
+		} ],
+		"query" : { 
+       "bool" : { 
+        "filter" : [ {
+					"range" : {
+						"CREATED_DATE" : {
+							"gte" : "now-2M/M",
+							"lte" : "now+1M/M",
+							"format" : "yyyy-MM-dd"
+						}
+					}
+				} ]
+			}
+    },
+    "size":1000,
+    "stored_fields": []
+}
+	
+var all={
+"sort" : [ {
+			"CREATED_DATE" : {
+				"order" : "desc"
+			}
+		} ],
+		"query" : { 
+		},
+		"size":1000
+
+}
+
+
+
+
+	$.ajax({   url: 'http://elasticsearch05.db.shared.int.sv2.247-inc.net:9200/dataanalytics/_search?pretty=true'
                      , method: 'POST'
-                     , data : JSON.stringify(heatmap)
+                     , data : JSON.stringify(all)
                      , dataType : 'json'
 					 ,contentType: "application/x-www-form-urlencoded; charset=utf-8"
                      
                      , success: function(json, statusText, xhr) {
 							result = json;
 							console.log(result);
+							var openTicketsData="Issue Key,Status,RCA,Assignee,Client,Priority,Created(mm/dd/yyyy),ReportedBy"+"\n";
+							
+
+
+
+
 							//console.log(result.aggregations.type1.buckets.length);
-                           /*for (var i=0;i<result.aggregations.langs.buckets.length;i++){
-						   document.getElementById("test").innerHTML+=result.aggregations.langs.buckets[i].key;
-						   document.getElementById("test").innerHTML+="<br>";
+                           for (var i=0;i<result.hits.hits.length;i++){
+                           	var ISSUE_ID=result.hits.hits[i]._source.ISSUE_ID;
+							var id=result.hits.hits[i]._id;
+							var Summary=result.hits.hits[i]._source.SUBJECT;
+							var Status=result.hits.hits[i]._source.STATUS;
+							var Assignee=result.hits.hits[i]._source.ASSIGNEE;
+							var client=result.hits.hits[i]._source.CLIENT;
+							var priority=result.hits.hits[i]._source.PRIORITY;
+							var Created=result.hits.hits[i]._source.CREATED_DATE;
+							var ReportedBy=result.hits.hits[i]._source.REPORTED_BY;
+							var RCA=result.hits.hits[i]._source.RCA_CLASSIFICATION;
+						 openTicketsData+=ISSUE_ID+","+Status+","+RCA+","+Assignee+","+client+","+priority+","+Created+","+ReportedBy+"\n";
+						   }
+downloadCSV(openTicketsData)
+						  
+						  /* for(var i=0;i<result.hits.hits.length;i++)
+						   {
+						   	console.log(result.hits.hits[i]._source.ISSUE_ID+"-------"+result.hits.hits[i]._source.CREATED_DATE+"---"+result.hits.hits[i]._source.CLIENT)
 						   }*/
                        }
                      , error: function(xhr, message, error) {
@@ -322,36 +649,26 @@ var components = {
 						   showError(error);
                       }
             });
+
+	function downloadCSV(openTicketsData) {
+        var data, filename, link;
+        var csv=openTicketsData;
+        var date=new Date();
+        if (csv == null) return;
+
+        filename = 'OpenTickets_'+date.getDate()+'-'+(date.getMonth()+1)+'-'+date.getFullYear()+'.csv';
+
+        if (!csv.match(/^data:text\/csv/i)) {
+            csv = 'data:text/csv;charset=utf-8,' + csv;
+        }
+        data = encodeURI(csv);
+
+        link = document.createElement('a');
+        link.setAttribute('href', data);
+        link.setAttribute('download', filename);
+        link.click();
+    }
 	
-
-
-
-
-
-
-
-
-
-/*
-els.count({
-  index: 'jirasecurity',
-  body:{
-  "query":{
-  "term":{
-  "Assignee": "Sharath"
-  }
-  }
-  }
-   
-}, function (error, response) {
-z=response;
-document.getElementById('test').innerHTML=response.count;
-  // ...
-});*/
-
-
-
-
 
 	</script>
 </head>
